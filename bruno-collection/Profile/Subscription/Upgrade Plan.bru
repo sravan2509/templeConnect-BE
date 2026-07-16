@@ -1,0 +1,21 @@
+meta {
+  name: Upgrade Plan
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/subscriptions/upgrade
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "plan": "premium_yearly"
+  }
+}

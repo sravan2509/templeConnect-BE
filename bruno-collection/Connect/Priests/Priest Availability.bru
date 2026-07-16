@@ -1,0 +1,22 @@
+meta {
+  name: Priest Availability
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/priests/:id/availability?date=2026-07-20
+  auth: bearer
+}
+
+params:path {
+  id: priest-1
+}
+
+params:query {
+  date: 2026-07-20
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

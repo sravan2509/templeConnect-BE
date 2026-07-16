@@ -1,0 +1,18 @@
+meta {
+  name: List Bookings
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/bookings?status=upcoming
+  auth: bearer
+}
+
+params:query {
+  status: upcoming
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

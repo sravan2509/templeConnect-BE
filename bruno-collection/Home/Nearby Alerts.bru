@@ -1,0 +1,16 @@
+meta {
+  name: Nearby Alerts
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/home/nearby-alerts?lat=17.385&lon=78.4867&radiusKm=5
+  auth: none
+}
+
+params:query {
+  lat: 17.385
+  lon: 78.4867
+  radiusKm: 5
+}

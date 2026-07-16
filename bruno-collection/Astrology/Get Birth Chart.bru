@@ -1,0 +1,14 @@
+meta {
+  name: Get Birth Chart
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/astrology/birth-chart
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

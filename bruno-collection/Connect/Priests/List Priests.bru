@@ -1,0 +1,21 @@
+meta {
+  name: List Priests
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/priests?specialization=&rating=&language=&availability=
+  auth: bearer
+}
+
+params:query {
+  specialization:
+  rating:
+  language:
+  availability:
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

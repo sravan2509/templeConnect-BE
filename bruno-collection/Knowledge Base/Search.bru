@@ -1,0 +1,14 @@
+meta {
+  name: Search Knowledge Base
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/knowledge-base?query=bell
+  auth: none
+}
+
+params:query {
+  query: bell
+}

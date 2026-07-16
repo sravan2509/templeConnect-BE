@@ -1,0 +1,14 @@
+meta {
+  name: Search Temples
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/locations/temples?query=Krishna Temple near Munich
+  auth: none
+}
+
+params:query {
+  query: Krishna Temple near Munich
+}

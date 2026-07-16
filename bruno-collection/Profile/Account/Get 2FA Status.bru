@@ -1,0 +1,14 @@
+meta {
+  name: Get 2FA Status
+  type: http
+  seq: 5
+}
+
+get {
+  url: {{baseUrl}}/api/users/me/2fa
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

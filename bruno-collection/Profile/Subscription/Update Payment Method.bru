@@ -1,0 +1,21 @@
+meta {
+  name: Update Payment Method
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/subscriptions/payment-method
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "paymentMethod": "card_ending_4242"
+  }
+}

@@ -1,0 +1,22 @@
+meta {
+  name: Create Donation
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/donations
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "templeName": "Shiva Temple",
+    "amount": 501
+  }
+}

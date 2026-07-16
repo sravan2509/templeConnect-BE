@@ -1,0 +1,14 @@
+meta {
+  name: Cancel Subscription
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/api/subscriptions/cancel
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

@@ -1,0 +1,18 @@
+meta {
+  name: Set Reminder
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/api/temples/:placeId/reminders
+  auth: bearer
+}
+
+params:path {
+  placeId: mock-place-1
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

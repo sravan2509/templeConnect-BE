@@ -1,0 +1,14 @@
+meta {
+  name: Get Linked Devices
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{baseUrl}}/api/users/me/devices
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

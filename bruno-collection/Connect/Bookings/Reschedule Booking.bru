@@ -1,0 +1,25 @@
+meta {
+  name: Reschedule Booking
+  type: http
+  seq: 4
+}
+
+patch {
+  url: {{baseUrl}}/api/bookings/:id/reschedule
+  body: json
+  auth: bearer
+}
+
+params:path {
+  id: booking-1
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "scheduledAt": "2026-08-05T10:00:00Z"
+  }
+}

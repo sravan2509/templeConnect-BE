@@ -1,0 +1,18 @@
+meta {
+  name: Cancel Booking
+  type: http
+  seq: 5
+}
+
+delete {
+  url: {{baseUrl}}/api/bookings/:id
+  auth: bearer
+}
+
+params:path {
+  id: booking-1
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

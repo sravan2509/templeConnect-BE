@@ -1,0 +1,14 @@
+meta {
+  name: Geocode
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/locations/geocode?place=Hyderabad, India
+  auth: none
+}
+
+params:query {
+  place: Hyderabad, India
+}

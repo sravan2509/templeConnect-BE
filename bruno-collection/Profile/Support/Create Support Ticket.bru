@@ -1,0 +1,21 @@
+meta {
+  name: Create Support Ticket
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/support/tickets
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "message": "I need help with a booking."
+  }
+}

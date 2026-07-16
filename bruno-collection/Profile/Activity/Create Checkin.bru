@@ -1,0 +1,21 @@
+meta {
+  name: Create Checkin
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/api/users/me/checkins
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "templeName": "Hanuman Temple"
+  }
+}

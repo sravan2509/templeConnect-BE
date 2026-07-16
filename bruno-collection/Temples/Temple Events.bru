@@ -1,0 +1,14 @@
+meta {
+  name: Temple Events
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/temples/:placeId/events
+  auth: none
+}
+
+params:path {
+  placeId: mock-place-1
+}

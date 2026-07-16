@@ -1,0 +1,14 @@
+meta {
+  name: Ritual Recommendations
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/astrology/recommendations
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

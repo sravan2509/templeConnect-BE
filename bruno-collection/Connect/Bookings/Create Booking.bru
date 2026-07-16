@@ -1,0 +1,23 @@
+meta {
+  name: Create Booking
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/api/bookings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "priestId": "priest-1",
+    "serviceId": "svc-1",
+    "scheduledAt": "2026-08-01T09:00:00Z"
+  }
+}

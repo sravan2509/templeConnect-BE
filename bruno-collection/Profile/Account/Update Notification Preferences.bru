@@ -1,0 +1,24 @@
+meta {
+  name: Update Notification Preferences
+  type: http
+  seq: 3
+}
+
+patch {
+  url: {{baseUrl}}/api/users/me/notification-preferences
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "pujaReminders": true,
+    "templeEventAlerts": true,
+    "bookingUpdates": true,
+    "promotionalOffers": false
+  }
+}

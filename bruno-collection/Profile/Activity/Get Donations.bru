@@ -1,0 +1,14 @@
+meta {
+  name: Get Donations
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/users/me/donations
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

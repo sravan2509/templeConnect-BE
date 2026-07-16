@@ -1,0 +1,14 @@
+meta {
+  name: Temple History
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/api/temples/:placeId/history
+  auth: none
+}
+
+params:path {
+  placeId: mock-place-1
+}

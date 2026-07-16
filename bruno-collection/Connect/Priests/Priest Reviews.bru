@@ -1,0 +1,18 @@
+meta {
+  name: Priest Reviews
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/priests/:id/reviews
+  auth: bearer
+}
+
+params:path {
+  id: priest-1
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

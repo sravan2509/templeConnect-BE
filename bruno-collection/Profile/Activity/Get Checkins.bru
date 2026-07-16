@@ -1,0 +1,14 @@
+meta {
+  name: Get Checkins
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/api/users/me/checkins
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

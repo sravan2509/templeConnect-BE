@@ -1,0 +1,18 @@
+meta {
+  name: Pay for Booking
+  type: http
+  seq: 6
+}
+
+post {
+  url: {{baseUrl}}/api/bookings/:id/pay
+  auth: bearer
+}
+
+params:path {
+  id: booking-1
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

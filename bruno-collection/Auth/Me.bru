@@ -1,0 +1,14 @@
+meta {
+  name: Me (session restore)
+  type: http
+  seq: 3
+}
+
+get {
+  url: {{baseUrl}}/api/users/me
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

@@ -1,0 +1,23 @@
+meta {
+  name: Create Birth Chart
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/api/astrology/birth-chart
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
+
+body:json {
+  {
+    "dob": "1995-08-15",
+    "time": "14:30",
+    "place": "Hyderabad, India"
+  }
+}

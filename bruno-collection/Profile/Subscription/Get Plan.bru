@@ -1,0 +1,14 @@
+meta {
+  name: Get Plan
+  type: http
+  seq: 1
+}
+
+get {
+  url: {{baseUrl}}/api/subscriptions/plan
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{authToken}}
+}

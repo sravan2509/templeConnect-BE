@@ -1,0 +1,19 @@
+meta {
+  name: Remove Reminder
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{baseUrl}}/api/temples/:placeId/reminders/:id
+  auth: bearer
+}
+
+params:path {
+  placeId: mock-place-1
+  id: reminder-id-here
+}
+
+auth:bearer {
+  token: {{authToken}}
+}
