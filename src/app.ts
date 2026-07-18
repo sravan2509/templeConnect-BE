@@ -20,13 +20,22 @@ import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 
 export const app = express();
 
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors());
 app.use(express.json());
 app.use(morgan("dev"));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 300 }));
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+  })
+);
 
-app.get("/health", (_req, res) => res.json({ status: "ok" }));
+app.get("/health", (_req, res) => res.json({ status: "ok", version: "2.0" }));
+
+app.get("/api/health", (_req, res) => res.json({ status: "ok", version: "2.0" }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/locations", locationRoutes);

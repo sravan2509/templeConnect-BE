@@ -3,31 +3,208 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
-  id           String      @id @default(uuid())
-  name         String
-  email        String      @unique
-  passwordHash String
-  birthChart   BirthChart?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  id              String       @id @default(uuid())
+  name            String
+  email           String       @unique
+  passwordHash    String
+  birthChart      BirthChart?
+  bookmarks       Bookmark[]
+  reminders       TempleReminder[]
+  checkins        Checkin[]
+  bookings        Booking[]
+  donations       Donation[]
+  supportTickets  SupportTicket[]
+  subscription    Subscription?
+  notificationPrefs NotificationPreference?
+  reviewsWritten  PriestReview[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
 }
 
 model BirthChart {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @unique
+  dob       String
+  time      String
+  placeName String
+  lat       Float
+  lon       Float
+  nakshatra String?
+  rashi     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Bookmark {
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  placeId   String
+  name      String
+  address   String?
+  lat       Float?
+  lon       Float?
+  createdAt DateTime  @default(now())
+}
+
+model TempleReminder {
+  id        String    @id @default(uuid())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  placeId   String
+  eventName String?
+  remindAt  DateTime
+  createdAt DateTime  @default(now())
+}
+
+model Checkin {
   id         String   @id @default(uuid())
-  user       User     @relation(fields: [userId], references: [id])
-  userId     String   @unique
-  dob        String
-  time       String
-  placeName  String
-  lat        Float
-  lon        Float
-  nakshatra  String?
-  rashi      String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  templeName String
+  placeId    String?
+  lat        Float?
+  lon        Float?
+  visitedAt  DateTime @default(now())
+}
+
+model Priest {
+  id              String               @id @default(uuid())
+  name            String
+  specialization  String               @default("")
+  languages       String               @default("")
+  rating          Float                @default(0)
+  reviewCount     Int                  @default(0)
+  verified        Boolean              @default(false)
+  experienceYears Int                  @default(0)
+  qualifications  String               @default("")
+  bio             String?
+  avatar          String?
+  services        PriestService[]
+  reviews         PriestReview[]
+  availability    PriestAvailability[]
+  bookingsReceived Booking[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+}
+
+model PriestService {
+  id           String   @id @default(uuid())
+  priest       Priest   @relation(fields: [priestId], references: [id], onDelete: Cascade)
+  priestId     String
+  name         String
+  description  String?
+  price        Float
+  durationMins Int
+  active       Boolean  @default(true)
+  bookings     Booking[]
+  createdAt    DateTime @default(now())
+}
+
+model PriestReview {
+  id        String   @id @default(uuid())
+  priest    Priest   @relation(fields: [priestId], references: [id], onDelete: Cascade)
+  priestId  String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+}
+
+model PriestAvailability {
+  id        String   @id @default(uuid())
+  priest    Priest   @relation(fields: [priestId], references: [id], onDelete: Cascade)
+  priestId  String
+  dayOfWeek Int
+  startTime String
+  endTime   String
+  createdAt DateTime @default(now())
+}
+
+model Booking {
+  id          String      @id @default(uuid())
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId      String
+  priest      Priest      @relation(fields: [priestId], references: [id])
+  priestId    String
+  service     PriestService @relation(fields: [serviceId], references: [id])
+  serviceId   String
+  scheduledAt DateTime
+  status      String      @default("pending")
+  paid        Boolean     @default(false)
+  amount      Float
+  paymentId   String?
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model Donation {
+  id         String   @id @default(uuid())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId     String
+  templeName String
+  placeId    String?
+  amount     Float
+  paymentId  String?
+  donatedAt  DateTime @default(now())
+}
+
+model Subscription {
+  id            String   @id @default(uuid())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String   @unique
+  plan          String   @default("free")
+  renewsAt      DateTime?
+  paymentMethod String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model SupportTicket {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  subject   String
+  message   String
+  status    String   @default("open")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model NotificationPreference {
+  id                 String  @id @default(uuid())
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId             String  @unique
+  pujaReminders      Boolean @default(true)
+  templeEventAlerts  Boolean @default(true)
+  bookingUpdates     Boolean @default(true)
+  promotionalOffers  Boolean @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Faq {
+  id       String @id @default(uuid())
+  question String
+  answer   String
+  category String @default("general")
+  order    Int    @default(0)
+}
+
+model KnowledgeArticle {
+  id       String @id @default(uuid())
+  title    String
+  summary  String
+  content  String
+  category String @default("general")
+  imageUrl String?
+  createdAt DateTime @default(now())
 }

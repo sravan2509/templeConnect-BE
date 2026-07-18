@@ -2,22 +2,18 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-function required(name: string, fallback?: string): string {
-  const value = process.env[name] ?? fallback;
-  if (value === undefined) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
+function optional(name: string, fallback: string): string {
+  return process.env[name] ?? fallback;
 }
 
 export const env = {
   port: Number(process.env.PORT ?? 4000),
   nodeEnv: process.env.NODE_ENV ?? "development",
-  databaseUrl: required("DATABASE_URL"),
-  jwtSecret: required("JWT_SECRET"),
+  databaseUrl: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/temple_connect?schema=public",
+  jwtSecret: optional("JWT_SECRET", "temple-connect-dev-secret-change-in-production"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
-  nominatimBaseUrl: process.env.NOMINATIM_BASE_URL ?? "https://nominatim.openstreetmap.org",
-  nominatimUserAgent: process.env.NOMINATIM_USER_AGENT ?? "temple-connect-app",
+  nominatimBaseUrl: optional("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"),
+  nominatimUserAgent: optional("NOMINATIM_USER_AGENT", "temple-connect-app (contact@example.com)"),
   googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY ?? "",
-  swissEphemerisBaseUrl: process.env.SWISS_EPHEMERIS_BASE_URL ?? "http://localhost:5001",
+  swissEphemerisBaseUrl: process.env.SWISS_EPHEMERIS_BASE_URL ?? "",
 };

@@ -14,6 +14,9 @@ import {
   updateMe,
   updateNotificationPrefs,
   getBookingsHistory,
+  getBookmarks,
+  createBookmark,
+  deleteBookmark,
 } from "../controllers/profile.controller";
 
 const router = Router();
@@ -36,5 +39,9 @@ router.get("/me/bookings-history", getBookingsHistory);
 router.get("/me/checkins", getCheckins);
 router.post("/me/checkins", createCheckin);
 router.get("/me/donations", getDonations);
+
+router.get("/me/bookmarks", getBookmarks);
+router.post("/me/bookmarks", createBookmark);
+router.delete("/me/bookmarks/:id", deleteBookmark);
 
 export default router;

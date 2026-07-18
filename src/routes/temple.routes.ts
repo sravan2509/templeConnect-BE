@@ -1,6 +1,8 @@
 import { Router } from "express";
-import { requireAuth } from "../middleware/auth";
 import {
+  findTemples,
+  findTemplesByDeityHandler,
+  findTemplesNearbyHandler,
   getTempleDetail,
   getTempleEvents,
   getTempleHistory,
@@ -9,10 +11,14 @@ import {
   removeReminder,
   setReminder,
 } from "../controllers/temple.controller";
+import { requireAuth } from "../middleware/auth";
 
 const router = Router();
 
 router.get("/map", mapView);
+router.get("/nearby", findTemplesNearbyHandler);
+router.post("/search-by-deity", findTemplesByDeityHandler);
+
 router.get("/:placeId", getTempleDetail);
 router.get("/:placeId/timings", getTempleTimings);
 router.get("/:placeId/events", getTempleEvents);
