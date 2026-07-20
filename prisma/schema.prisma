@@ -8,22 +8,48 @@ datasource db {
 }
 
 model User {
-  id              String       @id @default(uuid())
-  name            String
-  email           String       @unique
-  passwordHash    String
-  birthChart      BirthChart?
-  bookmarks       Bookmark[]
-  reminders       TempleReminder[]
-  checkins        Checkin[]
-  bookings        Booking[]
-  donations       Donation[]
-  supportTickets  SupportTicket[]
-  subscription    Subscription?
+  id                String                 @id @default(uuid())
+  name              String
+  email             String                 @unique
+  passwordHash      String
+  role              String                 @default("devotee")
+  pushToken         String?
+  priestProfile     Priest?
+  birthChart        BirthChart?
+  bookmarks         Bookmark[]
+  reminders         TempleReminder[]
+  checkins          Checkin[]
+  bookings          Booking[]
+  donations         Donation[]
+  supportTickets    SupportTicket[]
+  subscription      Subscription?
   notificationPrefs NotificationPreference?
-  reviewsWritten  PriestReview[]
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  reviewsWritten    PriestReview[]
+  notifications     Notification[]
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  title     String
+  body      String
+  type      String   @default("info")
+  read      Boolean  @default(false)
+  data      String?
+  createdAt DateTime @default(now())
+}
+
+model DailySuggestion {
+  id        String   @id @default(uuid())
+  nakshatra String?
+  rashi     String?
+  type      String   @default("general")
+  title     String
+  body      String
+  createdAt DateTime @default(now())
 }
 
 model BirthChart {
@@ -76,7 +102,10 @@ model Checkin {
 
 model Priest {
   id              String               @id @default(uuid())
+  user            User?                @relation(fields: [userId], references: [id])
+  userId          String?              @unique
   name            String
+  phone           String?
   specialization  String               @default("")
   languages       String               @default("")
   rating          Float                @default(0)
@@ -87,11 +116,38 @@ model Priest {
   bio             String?
   avatar          String?
   services        PriestService[]
+  priestPujas     PriestPuja[]
   reviews         PriestReview[]
   availability    PriestAvailability[]
   bookingsReceived Booking[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
+}
+
+model Puja {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String?
+  duration    String      @default("60 mins")
+  basePrice   Float       @default(1000)
+  category    String      @default("general")
+  icon        String      @default("🛕")
+  active      Boolean     @default(true)
+  priestPujas PriestPuja[]
+  bookings    Booking[]
+  createdAt   DateTime    @default(now())
+}
+
+model PriestPuja {
+  id        String  @id @default(uuid())
+  priest    Priest  @relation(fields: [priestId], references: [id], onDelete: Cascade)
+  priestId  String
+  puja      Puja    @relation(fields: [pujaId], references: [id], onDelete: Cascade)
+  pujaId    String
+  price     Float?
+  createdAt DateTime @default(now())
+
+  @@unique([priestId, pujaId])
 }
 
 model PriestService {
@@ -103,7 +159,6 @@ model PriestService {
   price        Float
   durationMins Int
   active       Boolean  @default(true)
-  bookings     Booking[]
   createdAt    DateTime @default(now())
 }
 
@@ -129,21 +184,21 @@ model PriestAvailability {
 }
 
 model Booking {
-  id          String      @id @default(uuid())
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String        @id @default(uuid())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
-  priest      Priest      @relation(fields: [priestId], references: [id])
+  priest      Priest        @relation(fields: [priestId], references: [id])
   priestId    String
-  service     PriestService @relation(fields: [serviceId], references: [id])
-  serviceId   String
+  puja        Puja          @relation(fields: [pujaId], references: [id])
+  pujaId      String
   scheduledAt DateTime
-  status      String      @default("pending")
-  paid        Boolean     @default(false)
+  status      String        @default("pending")
+  paid        Boolean       @default(false)
   amount      Float
   paymentId   String?
   notes       String?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
 }
 
 model Donation {
@@ -187,6 +242,7 @@ model NotificationPreference {
   templeEventAlerts  Boolean @default(true)
   bookingUpdates     Boolean @default(true)
   promotionalOffers  Boolean @default(false)
+  dailySuggestions   Boolean @default(true)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 }
@@ -207,4 +263,12 @@ model KnowledgeArticle {
   category String @default("general")
   imageUrl String?
   createdAt DateTime @default(now())
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  text       String
+  createdAt  DateTime @default(now())
 }

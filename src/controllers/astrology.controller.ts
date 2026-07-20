@@ -6,6 +6,7 @@ import { getDeityRecommendation } from "../services/deity.service";
 import { geocodePlace } from "../services/geocode.service";
 import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth";
+import { AppError } from "../utils/AppError";
 import { forecastByRashi, getRecommendationsFor } from "../data/mockStore";
 
 const birthChartSchema = z.object({
@@ -26,6 +27,9 @@ const completeProfileSchema = z.object({
 
 export const createBirthChart = catchAsync(async (req: AuthRequest, res: Response) => {
   const { dob, time, place, lat: inputLat, lng: inputLng } = birthChartSchema.parse(req.body);
+
+  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
+  if (!user) throw new AppError("User not found. Please logout and login again.", 401);
 
   const lat = inputLat ?? (await geocodePlace(place)).lat;
   const lng = inputLng ?? (await geocodePlace(place)).lon;

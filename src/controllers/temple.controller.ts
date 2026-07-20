@@ -35,10 +35,10 @@ export const findTemplesByDeityHandler = catchAsync(async (req: Request, res: Re
 
 export const findTemplesNearbyHandler = catchAsync(async (req: Request, res: Response) => {
   const schema = z.object({
-    lat: z.number(),
-    lng: z.number(),
+    lat: z.coerce.number(),
+    lng: z.coerce.number(),
     deity: z.string().optional(),
-    radiusKm: z.number().optional().default(50),
+    radiusKm: z.coerce.number().optional().default(50),
   });
   const input = schema.parse(req.query);
   const results = await findTemplesNearby(input.lat, input.lng, input.deity, input.radiusKm);
