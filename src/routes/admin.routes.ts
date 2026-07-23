@@ -11,12 +11,21 @@ import {
   getNotifications, markRead, markAllRead, getUnreadCount,
   getDailySuggestion, autocompletePlaces, getMapTemples, sendDailySuggestionPush,
 } from "../controllers/app.controller";
+import {
+  listKbArticles, createKbArticle, updateKbArticle, deleteKbArticle
+} from "../controllers/knowledgeBaseAdmin.controller";
 
 const router = Router();
 router.use(requireAuth);
 
 // Admin dashboard
 router.get("/dashboard", requireAdmin, adminDashboard);
+
+// Knowledge Base management (admin)
+router.get("/kb", requireAdmin, listKbArticles);
+router.post("/kb", requireAdmin, createKbArticle);
+router.patch("/kb/:id", requireAdmin, updateKbArticle);
+router.delete("/kb/:id", requireAdmin, deleteKbArticle);
 
 // Puja management (admin)
 router.get("/pujas", listPujas);

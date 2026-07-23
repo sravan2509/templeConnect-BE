@@ -31,11 +31,22 @@ export const createBirthChart = catchAsync(async (req: AuthRequest, res: Respons
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) throw new AppError("User not found. Please logout and login again.", 401);
 
-  const lat = inputLat ?? (await geocodePlace(place)).lat;
-  const lng = inputLng ?? (await geocodePlace(place)).lon;
-  const location = await geocodePlace(place);
+  let lat = inputLat;
+  let lng = inputLng;
+  let placeName = place;
 
-  const profile = calculateAstroProfile(dob, time, lat, lng);
+  if (lat === undefined || lng === undefined) {
+    try {
+      const location = await geocodePlace(place);
+      lat = location.lat;
+      lng = location.lon;
+      placeName = location.displayName;
+    } catch (error) {
+      throw new AppError("Could not find coordinates for the given place. Please provide a more specific location or select from suggestions.", 400);
+    }
+  }
+
+  const profile = calculateAstroProfile(dob, time, lat!, lng!);
 
   const saved = await prisma.birthChart.upsert({
     where: { userId: req.userId! },
@@ -43,18 +54,18 @@ export const createBirthChart = catchAsync(async (req: AuthRequest, res: Respons
       userId: req.userId!,
       dob,
       time,
-      placeName: location.displayName,
-      lat,
-      lon: lng,
+      placeName,
+      lat: lat!,
+      lon: lng!,
       nakshatra: profile.nakshatra.name,
       rashi: profile.rashi.name,
     },
     update: {
       dob,
       time,
-      placeName: location.displayName,
-      lat,
-      lon: lng,
+      placeName,
+      lat: lat!,
+      lon: lng!,
       nakshatra: profile.nakshatra.name,
       rashi: profile.rashi.name,
     },
