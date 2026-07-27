@@ -26,6 +26,10 @@ model User {
   notificationPrefs NotificationPreference?
   reviewsWritten    PriestReview[]
   notifications     Notification[]
+  sentMessages      Message[]             @relation("FromUser")
+  receivedMessages  Message[]             @relation("ToUser")
+  resetToken        String?
+  resetTokenExpiry  DateTime?
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
 }
@@ -269,6 +273,8 @@ model Message {
   id         String   @id @default(uuid())
   fromUserId String
   toUserId   String
+  fromUser   User     @relation("FromUser", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ToUser", fields: [toUserId], references: [id], onDelete: Cascade)
   text       String
   createdAt  DateTime @default(now())
 }

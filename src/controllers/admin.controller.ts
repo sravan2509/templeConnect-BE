@@ -1,4 +1,5 @@
 import { Response } from "express";
+import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { catchAsync } from "../utils/catchAsync";
 import { AuthRequest } from "../middleware/auth";
@@ -68,7 +69,6 @@ export const createPriest = catchAsync(async (req: AuthRequest, res: Response) =
   if (data.email && data.password) {
     const existing = await prisma.user.findUnique({ where: { email: data.email } });
     if (existing) throw new AppError("Email already in use", 409);
-    const bcrypt = require("bcryptjs");
     const hash = await bcrypt.hash(data.password, 10);
     const user = await prisma.user.create({
       data: { name: data.name, email: data.email, passwordHash: hash, role: "priest" },
@@ -186,7 +186,7 @@ export const acceptBooking = catchAsync(async (req: AuthRequest, res: Response) 
   });
 
   sendPushNotification(updated!.userId, "Booking Confirmed",
-    `Your booking with ${priest.name} for "${updated!.puja.name}" on ${new Date(updated!.scheduledAt).toLocaleDateString()} has been confirmed.`,
+    `Your booking with ${priest.name} for "${updated!.puja.name}" on ${new Date(updated!.scheduledAt).toLocaleDateString()} has been confirmed. Contact Priest: ${priest.phone || 'N/A'}`,
     { type: "booking_confirmed", bookingId: updated!.id });
 
   res.json(updated);

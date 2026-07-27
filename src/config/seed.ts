@@ -100,17 +100,18 @@ async function seed() {
 
   // ── FAQs ──
   for (const f of [
-    { question: "How do I book a puja?", answer: "Go to Connect tab → Book a Puja → Select puja → Choose priest → Confirm. The priest will then accept or suggest another time." },
-    { question: "How to get my astrology profile?", answer: "Home tab → Enter Birth Details → Calculate. Your Nakshatra, Rashi, and recommended deity will be shown." },
-    { question: "Can I cancel a booking?", answer: "From My Bookings, tap on a pending booking to cancel. Free if 24hrs before the scheduled time." },
-  ]) { await prisma.faq.create({ data: f }); }
+    { question: "How do I book a puja?", answer: "Go to Connect tab → Book a Puja → Select puja → Choose priest → Confirm. The priest will then accept or suggest another time.", category: "general", order: 1 },
+    { question: "How to get my astrology profile?", answer: "Home tab → Enter Birth Details → Calculate. Your Nakshatra, Rashi, and recommended deity will be shown.", category: "general", order: 2 },
+    { question: "Can I cancel a booking?", answer: "From My Bookings, tap on a pending booking to cancel. Free if 24hrs before the scheduled time.", category: "general", order: 3 },
+  ]) { await prisma.faq.deleteMany({ where: { question: f.question } }); await prisma.faq.create({ data: f }); }
 
   // ── Daily suggestions ──
-  for (const s of [
-    { nakshatra: "Revati", rashi: null, title: "Vishnu Sahasranama", body: "Recite Vishnu Sahasranama today. Offer tulsi leaves and yellow flowers to Lord Vishnu.", type: "nakshatra" },
-    { nakshatra: null, rashi: null, title: "Morning Surya Arghya", body: "Wake before sunrise. Offer water to the rising Sun. Chant 'Om Suryaya Namah' 12 times.", type: "general" },
-    { nakshatra: null, rashi: null, title: "Evening Diya", body: "Light a diya near your Tulsi plant or home altar. Sit in silence for 5 minutes after lighting it.", type: "general" },
-  ]) { await prisma.dailySuggestion.create({ data: s }); }
+  const sugData = [
+    { id: "sug-revati", nakshatra: "Revati", rashi: null, title: "Vishnu Sahasranama", body: "Recite Vishnu Sahasranama today. Offer tulsi leaves and yellow flowers to Lord Vishnu.", type: "nakshatra" },
+    { id: "sug-morning", nakshatra: null, rashi: null, title: "Morning Surya Arghya", body: "Wake before sunrise. Offer water to the rising Sun. Chant 'Om Suryaya Namah' 12 times.", type: "general" },
+    { id: "sug-evening", nakshatra: null, rashi: null, title: "Evening Diya", body: "Light a diya near your Tulsi plant or home altar. Sit in silence for 5 minutes after lighting it.", type: "general" },
+  ];
+  for (const s of sugData) { await prisma.dailySuggestion.upsert({ where: { id: s.id }, update: {}, create: s }); }
 
   const counts = { users: await prisma.user.count(), pujas: await prisma.puja.count(), priests: await prisma.priest.count(), bookings: await prisma.booking.count() };
   console.log(`\n✅ Done! Users:${counts.users} Pujas:${counts.pujas} Priests:${counts.priests} Bookings:${counts.bookings}\n`);

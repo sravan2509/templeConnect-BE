@@ -8,18 +8,17 @@ export interface AuthRequest extends ExpressRequest {
 }
 
 export function requireAuth(req: AuthRequest, _res: Response, next: NextFunction) {
-  const header = req.headers["authorization"] as string | undefined;
-  if (!header?.startsWith("Bearer ")) {
-    throw new AppError("Authentication required", 401);
-  }
-
-  const token = header.slice("Bearer ".length);
   try {
+    const header = req.headers["authorization"] as string | undefined;
+    if (!header?.startsWith("Bearer ")) {
+      return next(new AppError("Authentication required", 401));
+    }
+    const token = header.slice("Bearer ".length);
     const payload = verifyToken(token);
     req.userId = payload.userId;
-    (req as any).userRole = payload.role || "devotee";
+    req.userRole = payload.role || "devotee";
     next();
-  } catch {
-    throw new AppError("Invalid or expired token", 401);
+  } catch (err) {
+    next(err instanceof AppError ? err : new AppError("Invalid or expired token", 401));
   }
 }

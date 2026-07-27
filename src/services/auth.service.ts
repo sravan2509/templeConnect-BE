@@ -4,8 +4,9 @@ import { AppError } from "../utils/AppError";
 import { signToken } from "../utils/jwt";
 
 export async function registerUser(name: string, email: string, password: string) {
-  console.log(`[AUTH] Register attempt: ${email}`);
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const lowerEmail = email.toLowerCase();
+  console.log(`[AUTH] Register attempt: ${lowerEmail}`);
+  const existing = await prisma.user.findUnique({ where: { email: lowerEmail } });
   if (existing) {
     console.log(`[AUTH] Register failed: ${email} already exists`);
     throw new AppError("Email already registered", 409);
@@ -13,7 +14,7 @@ export async function registerUser(name: string, email: string, password: string
 
   const passwordHash = await bcrypt.hash(password, 10);
   const user = await prisma.user.create({
-    data: { name, email, passwordHash },
+    data: { name, email: lowerEmail, passwordHash },
   });
 
   const token = signToken({ userId: user.id, role: user.role });
@@ -22,8 +23,9 @@ export async function registerUser(name: string, email: string, password: string
 }
 
 export async function loginUser(email: string, password: string) {
-  console.log(`[AUTH] Login attempt: ${email}`);
-  const user = await prisma.user.findUnique({ where: { email } });
+  const lowerEmail = email.toLowerCase();
+  console.log(`[AUTH] Login attempt: ${lowerEmail}`);
+  const user = await prisma.user.findUnique({ where: { email: lowerEmail } });
   if (!user) {
     console.log(`[AUTH] Login failed: ${email} not found`);
     throw new AppError("Invalid email or password", 401);

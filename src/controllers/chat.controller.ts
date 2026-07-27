@@ -51,6 +51,18 @@ export const getMessages = catchAsync(async (req: AuthRequest, res: Response) =>
   res.json(messages);
 });
 
+export const sendMessage = catchAsync(async (req: AuthRequest, res: Response) => {
+  const { text } = z.object({ text: z.string().min(1) }).parse(req.body);
+  const msg = await prisma.message.create({
+    data: { fromUserId: req.userId!, toUserId: req.params.userId, text },
+  });
+  const target = clients.get(req.params.userId);
+  if (target && target.readyState === 1) {
+    target.send(JSON.stringify({ type: "chat", from: req.userId, text, time: new Date().toISOString() }));
+  }
+  res.status(201).json(msg);
+});
+
 export const submitReview = catchAsync(async (req: AuthRequest, res: Response) => {
   const { rating, comment } = z.object({ rating: z.number().min(1).max(5), comment: z.string().optional() }).parse(req.body);
   const priestId = req.params.id;

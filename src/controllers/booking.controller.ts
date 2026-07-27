@@ -74,7 +74,8 @@ export const createBookingHandler = catchAsync(async (req: AuthRequest, res: Res
   const pp = await prisma.priestPuja.findUnique({
     where: { priestId_pujaId: { priestId, pujaId } },
   });
-  const amount = pp?.price || puja.basePrice;
+  if (!pp) throw new AppError("This priest does not offer that puja", 400);
+  const amount = pp.price || puja.basePrice;
 
   const booking = await prisma.booking.create({
     data: { userId: req.userId!, priestId, pujaId, scheduledAt: new Date(scheduledAt), amount, notes },
