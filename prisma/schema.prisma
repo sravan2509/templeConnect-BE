@@ -278,3 +278,40 @@ model Message {
   text       String
   createdAt  DateTime @default(now())
 }
+
+model Temple {
+  id          String        @id @default(uuid())
+  name        String
+  placeId     String        @unique
+  address     String?
+  city        String?
+  state       String?
+  lat         Float?
+  lon         Float?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  events      TempleEvent[]
+  templePujas TemplePuja[]
+}
+
+model TempleEvent {
+  id          String   @id @default(uuid())
+  temple      Temple   @relation(fields: [templeId], references: [id], onDelete: Cascade)
+  templeId    String
+  name        String
+  description String?
+  date        String
+  time        String?
+  createdAt   DateTime @default(now())
+}
+
+model TemplePuja {
+  id          String   @id @default(uuid())
+  temple      Temple   @relation(fields: [templeId], references: [id], onDelete: Cascade)
+  templeId    String
+  name        String
+  description String?
+  schedule    String?
+  time        String?
+  createdAt   DateTime @default(now())
+}

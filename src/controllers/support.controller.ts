@@ -45,3 +45,20 @@ export const getSupportTickets = catchAsync(async (req: AuthRequest, res: Respon
   });
   res.json(tickets);
 });
+
+const faqSchema = z.object({ question: z.string().min(1), answer: z.string().min(1), category: z.string().optional(), order: z.number().optional() });
+
+export const createFaq = catchAsync(async (req: AuthRequest, res: Response) => {
+  const faq = await prisma.faq.create({ data: faqSchema.parse(req.body) });
+  res.status(201).json(faq);
+});
+
+export const updateFaq = catchAsync(async (req: AuthRequest, res: Response) => {
+  const faq = await prisma.faq.update({ where: { id: req.params.id }, data: req.body });
+  res.json(faq);
+});
+
+export const deleteFaq = catchAsync(async (req: AuthRequest, res: Response) => {
+  await prisma.faq.delete({ where: { id: req.params.id } });
+  res.status(204).send();
+});

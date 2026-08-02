@@ -1,4 +1,5 @@
 import { Response } from "express";
+import { z } from "zod";
 import { catchAsync } from "../utils/catchAsync";
 import { AuthRequest } from "../middleware/auth";
 import { prisma } from "../config/prisma";
@@ -142,3 +143,22 @@ function getAllTemples(): any[] {
   }
   return results;
 }
+
+const sugSchema = z.object({ title: z.string().min(1), body: z.string().min(1), nakshatra: z.string().optional(), rashi: z.string().optional(), type: z.string().optional() });
+
+export const listSuggestions = catchAsync(async (_req: AuthRequest, res: Response) => {
+  res.json(await prisma.dailySuggestion.findMany());
+});
+
+export const createSuggestion = catchAsync(async (req: AuthRequest, res: Response) => {
+  res.status(201).json(await prisma.dailySuggestion.create({ data: sugSchema.parse(req.body) }));
+});
+
+export const updateSuggestion = catchAsync(async (req: AuthRequest, res: Response) => {
+  res.json(await prisma.dailySuggestion.update({ where: { id: req.params.id }, data: req.body }));
+});
+
+export const deleteSuggestion = catchAsync(async (req: AuthRequest, res: Response) => {
+  await prisma.dailySuggestion.delete({ where: { id: req.params.id } });
+  res.status(204).send();
+});

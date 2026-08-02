@@ -12,6 +12,7 @@ import {
 } from "../data/mockStore";
 import { AuthRequest } from "../middleware/auth";
 import { AppError } from "../utils/AppError";
+import { prisma } from "../config/prisma";
 
 const templeSearchSchema = z.object({ query: z.string().min(1) });
 
@@ -53,11 +54,29 @@ export const mapView = catchAsync(async (req: Request, res: Response) => {
 
 export const getTempleDetail = catchAsync(async (req: Request, res: Response) => {
   const { placeId } = req.params;
-  res.json({
-    ...mockTempleHistory(placeId),
-    timings: mockTempleTimings(placeId),
-    events: mockTempleEvents(placeId),
+
+  // Check if temple exists in DB with admin-curated data
+  const dbTemple = await prisma.temple.findUnique({
+    where: { placeId },
+    include: { events: true, templePujas: true },
   });
+
+  if (dbTemple) {
+    res.json({
+      ...mockTempleHistory(placeId),
+      timings: mockTempleTimings(placeId),
+      events: dbTemple.events,
+      pujas: dbTemple.templePujas,
+      source: "db",
+    });
+  } else {
+    res.json({
+      ...mockTempleHistory(placeId),
+      timings: mockTempleTimings(placeId),
+      events: mockTempleEvents(placeId),
+      source: "api",
+    });
+  }
 });
 
 export const getTempleTimings = catchAsync(async (req: Request, res: Response) => {
@@ -65,7 +84,28 @@ export const getTempleTimings = catchAsync(async (req: Request, res: Response) =
 });
 
 export const getTempleEvents = catchAsync(async (req: Request, res: Response) => {
-  res.json(mockTempleEvents(req.params.placeId));
+  const { placeId } = req.params;
+
+  // Check DB first
+  const dbTemple = await prisma.temple.findUnique({
+    where: { placeId },
+    include: { events: true, templePujas: true },
+  });
+
+  if (dbTemple) {
+    res.json({
+      source: "db",
+      events: dbTemple.events,
+      pujas: dbTemple.templePujas,
+    });
+  } else {
+    res.json({
+      source: "api",
+      events: [],
+      pujas: [],
+      message: "Currently the data is not available",
+    });
+  }
 });
 
 export const getTempleHistory = catchAsync(async (req: Request, res: Response) => {
