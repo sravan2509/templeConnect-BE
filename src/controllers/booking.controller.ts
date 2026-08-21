@@ -51,7 +51,7 @@ export const listBookings = catchAsync(async (req: AuthRequest, res: Response) =
 
   const bookings = await prisma.booking.findMany({
     where,
-    include: { priest: { select: { name: true } }, puja: { select: { name: true, icon: true } } },
+    include: { priest: { select: { name: true, userId: true } }, puja: { select: { name: true, icon: true } } },
     orderBy: { scheduledAt: "desc" },
   });
   res.json(bookings);
@@ -94,7 +94,7 @@ export const createBookingHandler = catchAsync(async (req: AuthRequest, res: Res
 export const getBooking = catchAsync(async (req: AuthRequest, res: Response) => {
   const booking = await prisma.booking.findFirst({
     where: { id: req.params.id, userId: req.userId! },
-    include: { priest: { select: { name: true } }, puja: { select: { name: true, icon: true } } },
+    include: { priest: { select: { name: true, userId: true } }, puja: { select: { name: true, icon: true } } },
   });
   if (!booking) throw new AppError("Booking not found", 404);
   res.json(booking);

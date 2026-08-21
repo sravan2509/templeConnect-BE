@@ -22,12 +22,26 @@ export function setWebSocketServer(server: WebSocketServer) {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.type === "chat" && msg.to && msg.text) {
-          await prisma.message.create({
+          const created = await prisma.message.create({
             data: { fromUserId: userId || "", toUserId: msg.to, text: msg.text },
           });
           const target = clients.get(msg.to);
           if (target && target.readyState === 1) {
-            target.send(JSON.stringify({ type: "chat", from: userId, text: msg.text, time: new Date().toISOString() }));
+            target.send(JSON.stringify({ type: "chat", from: userId, text: msg.text, time: new Date().toISOString(), messageId: created.id }));
+          }
+          // Send delivery confirmation back to sender
+          ws.send(JSON.stringify({ type: "sent", messageId: created.id }));
+        }
+        if (msg.type === "read" && msg.fromUserId && userId) {
+          // Mark all messages from the other user as read
+          await prisma.message.updateMany({
+            where: { fromUserId: msg.fromUserId, toUserId: userId, read: false },
+            data: { read: true, readAt: new Date() },
+          });
+          // Notify the original sender that their messages were read
+          const sender = clients.get(msg.fromUserId);
+          if (sender && sender.readyState === 1) {
+            sender.send(JSON.stringify({ type: "read_receipt", readBy: userId }));
           }
         }
       } catch {}
@@ -47,18 +61,34 @@ export const getMessages = catchAsync(async (req: AuthRequest, res: Response) =>
     },
     orderBy: { createdAt: "asc" },
     take: 100,
+    select: { id: true, fromUserId: true, toUserId: true, text: true, read: true, readAt: true, createdAt: true },
   });
   res.json(messages);
+});
+
+export const markMessagesRead = catchAsync(async (req: AuthRequest, res: Response) => {
+  const otherId = req.params.userId;
+  await prisma.message.updateMany({
+    where: { fromUserId: otherId, toUserId: req.userId!, read: false },
+    data: { read: true, readAt: new Date() },
+  });
+  // Notify via WebSocket
+  const sender = clients.get(otherId);
+  if (sender && sender.readyState === 1) {
+    sender.send(JSON.stringify({ type: "read_receipt", readBy: req.userId }));
+  }
+  res.json({ success: true });
 });
 
 export const sendMessage = catchAsync(async (req: AuthRequest, res: Response) => {
   const { text } = z.object({ text: z.string().min(1) }).parse(req.body);
   const msg = await prisma.message.create({
     data: { fromUserId: req.userId!, toUserId: req.params.userId, text },
+    select: { id: true, fromUserId: true, toUserId: true, text: true, read: true, readAt: true, createdAt: true },
   });
   const target = clients.get(req.params.userId);
   if (target && target.readyState === 1) {
-    target.send(JSON.stringify({ type: "chat", from: req.userId, text, time: new Date().toISOString() }));
+    target.send(JSON.stringify({ type: "chat", from: req.userId, text, time: new Date().toISOString(), messageId: msg.id }));
   }
   res.status(201).json(msg);
 });

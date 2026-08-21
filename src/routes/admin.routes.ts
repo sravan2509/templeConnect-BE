@@ -1,4 +1,5 @@
 import { Router } from "express";
+import multer from "multer";
 import { requireAuth } from "../middleware/auth";
 import { requireAdmin, requirePriest } from "../middleware/roleAuth";
 import {
@@ -14,6 +15,9 @@ import {
 } from "../controllers/app.controller";
 import { createFaq, updateFaq, deleteFaq } from "../controllers/support.controller";
 import { listKbArticles, createKbArticle, updateKbArticle, deleteKbArticle } from "../controllers/knowledgeBaseAdmin.controller";
+import { downloadTemplate, uploadTemples, listAllTemples, updateTemple, deleteTemple } from "../controllers/templeUpload.controller";
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
 const router = Router();
 router.use(requireAuth);
@@ -68,6 +72,13 @@ router.delete("/faqs/:id", requireAdmin, deleteFaq);
 // App
 router.get("/autocomplete", autocompletePlaces);
 router.get("/map-temples", getMapTemples);
+
+// Temple Upload & Management
+router.get("/temples/template", requireAdmin, downloadTemplate);
+router.post("/temples/upload", requireAdmin, upload.single("file"), uploadTemples);
+router.get("/temples", requireAdmin, listAllTemples);
+router.patch("/temples/:id", requireAdmin, updateTemple);
+router.delete("/temples/:id", requireAdmin, deleteTemple);
 
 router.post("/push-token", registerPushToken);
 

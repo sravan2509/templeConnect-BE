@@ -61,18 +61,41 @@ export const getTempleDetail = catchAsync(async (req: Request, res: Response) =>
     include: { events: true, templePujas: true },
   });
 
+  const mock = mockTempleHistory(placeId);
+  const timings = mockTempleTimings(placeId);
+
   if (dbTemple) {
     res.json({
-      ...mockTempleHistory(placeId),
-      timings: mockTempleTimings(placeId),
+      placeId,
+      name: dbTemple.name,
+      deity: dbTemple.deityName || mock.deity || "Various",
+      history: dbTemple.templeHistory || mock.history || "A renowned Hindu temple.",
+      builtCentury: mock.builtCentury || "Ancient",
+      significance: dbTemple.significance || null,
+      sevas: dbTemple.sevas || null,
+      contactDetails: dbTemple.contactDetails || null,
+      websiteLink: dbTemple.websiteLink || null,
+      address: dbTemple.address || null,
+      city: dbTemple.city || null,
+      state: dbTemple.state || null,
+      lat: dbTemple.lat,
+      lon: dbTemple.lon,
+      timings,
       events: dbTemple.events,
       pujas: dbTemple.templePujas,
       source: "db",
     });
   } else {
     res.json({
-      ...mockTempleHistory(placeId),
-      timings: mockTempleTimings(placeId),
+      placeId,
+      deity: mock.deity || "Various",
+      history: mock.history || "A renowned Hindu temple.",
+      builtCentury: mock.builtCentury || "Ancient",
+      significance: null,
+      sevas: null,
+      contactDetails: null,
+      websiteLink: null,
+      timings,
       events: mockTempleEvents(placeId),
       source: "api",
     });

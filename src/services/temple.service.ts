@@ -5,6 +5,7 @@ import { getSearchKeywords } from "../data/deityTempleKeywords";
 import { FAMOUS_TEMPLES, FamousTemple } from "../data/famousTemples";
 import { haversineDistance } from "../utils/haversine";
 import { getAreaCoordinates } from "./location.service";
+import { prisma } from "../config/prisma";
 
 export interface TempleResult {
   name: string;
@@ -44,6 +45,36 @@ export async function searchTemples(query: string): Promise<TempleResult[]> {
   if (templeCache.has(cacheKey)) return templeCache.get(cacheKey)!;
 
   const q = query.toLowerCase();
+
+  // 1. Search DB first
+  try {
+    const dbTemples = await prisma.temple.findMany({
+      where: {
+        OR: [
+          { name: { contains: q } },
+          { city: { contains: q } },
+          { state: { contains: q } },
+          { deityName: { contains: q } },
+        ],
+      },
+      take: 20,
+    });
+    if (dbTemples.length > 0) {
+      const results: TempleResult[] = dbTemples.map((t) => ({
+        name: t.name,
+        rating: null,
+        address: t.address || `${t.city || ""}, ${t.state || ""}`,
+        placeId: t.placeId,
+        location: t.lat && t.lon ? { lat: t.lat, lon: t.lon } : null,
+        city: t.city || undefined,
+        state: t.state || undefined,
+      }));
+      templeCache.set(cacheKey, results);
+      return results;
+    }
+  } catch {}
+
+  // 2. Search famous temples dataset
   const allTemples = getAllFamousTemples();
 
   const directMatches = allTemples.filter((t) => {
@@ -62,8 +93,11 @@ export async function searchTemples(query: string): Promise<TempleResult[]> {
       if (!aExact && bExact) return 1;
       return a.name.length - b.name.length;
     });
-    templeCache.set(cacheKey, directMatches.slice(0, 20));
-    return directMatches.slice(0, 20);
+    const results = directMatches.slice(0, 20);
+    templeCache.set(cacheKey, results);
+    // Auto-save to DB in background
+    saveTemplesToDB(results).catch(() => {});
+    return results;
   }
 
   for (const [deity, temples] of Object.entries(FAMOUS_TEMPLES)) {
@@ -71,11 +105,13 @@ export async function searchTemples(query: string): Promise<TempleResult[]> {
       if (q.includes(kw.toLowerCase()) && kw.length > 3) {
         const results = getFamousTemplesForDeity(deity).slice(0, 8);
         templeCache.set(cacheKey, results);
+        saveTemplesToDB(results).catch(() => {});
         return results;
       }
     }
   }
 
+  // 3. Nominatim API fallback
   try {
     const { data } = await axios.get(`${env.nominatimBaseUrl}/search`, {
       params: { q: query + " temple", format: "json", limit: 15 },
@@ -97,6 +133,8 @@ export async function searchTemples(query: string): Promise<TempleResult[]> {
       }));
     if (nominatimResults.length > 0) {
       templeCache.set(cacheKey, nominatimResults);
+      // Auto-save API results to DB
+      saveTemplesToDB(nominatimResults).catch(() => {});
       return nominatimResults;
     }
   } catch (err: any) {
@@ -106,6 +144,28 @@ export async function searchTemples(query: string): Promise<TempleResult[]> {
   const fallback = allTemples.slice(0, 8);
   templeCache.set(cacheKey, fallback);
   return fallback;
+}
+
+// Auto-save temple search results to DB for future lookups
+async function saveTemplesToDB(temples: TempleResult[]): Promise<void> {
+  for (const t of temples) {
+    try {
+      const existing = await prisma.temple.findUnique({ where: { placeId: t.placeId } });
+      if (!existing) {
+        await prisma.temple.create({
+          data: {
+            name: t.name,
+            placeId: t.placeId,
+            address: t.address,
+            city: t.city || null,
+            state: t.state || null,
+            lat: t.location?.lat || null,
+            lon: t.location?.lon || null,
+          },
+        });
+      }
+    } catch {} // Ignore duplicate placeId errors
+  }
 }
 
 export interface TempleSearchByDeityInput {

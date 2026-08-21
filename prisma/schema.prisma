@@ -270,28 +270,37 @@ model KnowledgeArticle {
 }
 
 model Message {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   fromUserId String
   toUserId   String
-  fromUser   User     @relation("FromUser", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toUser     User     @relation("ToUser", fields: [toUserId], references: [id], onDelete: Cascade)
+  fromUser   User      @relation("FromUser", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User      @relation("ToUser", fields: [toUserId], references: [id], onDelete: Cascade)
   text       String
-  createdAt  DateTime @default(now())
+  read       Boolean   @default(false)
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
 }
 
 model Temple {
-  id          String        @id @default(uuid())
-  name        String
-  placeId     String        @unique
-  address     String?
-  city        String?
-  state       String?
-  lat         Float?
-  lon         Float?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  events      TempleEvent[]
-  templePujas TemplePuja[]
+  id             String        @id @default(uuid())
+  serialNumber   Int?
+  name           String
+  placeId        String        @unique
+  deityName      String?
+  address        String?
+  city           String?
+  state          String?
+  lat            Float?
+  lon            Float?
+  contactDetails String?
+  templeHistory  String?
+  significance   String?
+  sevas          String?
+  websiteLink    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  events         TempleEvent[]
+  templePujas    TemplePuja[]
 }
 
 model TempleEvent {

@@ -15,6 +15,19 @@ export const geocode = catchAsync(async (req: Request, res: Response) => {
   res.json(result);
 });
 
+export const autocompleteCities = catchAsync(async (req: Request, res: Response) => {
+  const { place } = geocodeSchema.parse(req.query);
+  const axios = require("axios");
+  const { env } = require("../config/env");
+  const { data } = await axios.get(`${env.nominatimBaseUrl}/search`, {
+    params: { q: place, format: "json", limit: 5, featuretype: "city" },
+    headers: { "User-Agent": env.nominatimUserAgent },
+    timeout: 10000,
+  });
+  const results = data.map((d: any) => ({ label: d.display_name, lat: parseFloat(d.lat), lon: parseFloat(d.lon) }));
+  res.json(results);
+});
+
 export const findTemples = catchAsync(async (req: Request, res: Response) => {
   const { query } = templeSearchSchema.parse(req.query);
   const results = await searchTemples(query);

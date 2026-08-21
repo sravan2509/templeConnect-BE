@@ -195,7 +195,7 @@ export const deleteBookmark = catchAsync(async (req: AuthRequest, res: Response)
 export const getBookingsHistory = catchAsync(async (req: AuthRequest, res: Response) => {
   const bookings = await prisma.booking.findMany({
     where: { userId: req.userId!, status: { in: ["completed", "cancelled"] } },
-    include: { priest: { select: { name: true } }, puja: { select: { name: true } } },
+    include: { priest: { select: { name: true, userId: true } }, puja: { select: { name: true, icon: true } } },
     orderBy: { scheduledAt: "desc" },
   });
   res.json(bookings);
