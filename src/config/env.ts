@@ -14,6 +14,6 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "365d",
   nominatimBaseUrl: optional("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"),
   nominatimUserAgent: optional("NOMINATIM_USER_AGENT", "temple-connect-app (contact@example.com)"),
-  googlePlacesApiKey: process.env.GOOGLE_PLACES_API_KEY ?? "",
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
   swissEphemerisBaseUrl: process.env.SWISS_EPHEMERIS_BASE_URL ?? "",
 };

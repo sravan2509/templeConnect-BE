@@ -15,6 +15,7 @@ import {
 } from "../controllers/app.controller";
 import { createFaq, updateFaq, deleteFaq } from "../controllers/support.controller";
 import { listKbArticles, createKbArticle, updateKbArticle, deleteKbArticle } from "../controllers/knowledgeBaseAdmin.controller";
+import { importTemplesCSV } from "../controllers/import.controller";
 import { downloadTemplate, uploadTemples, listAllTemples, updateTemple, deleteTemple } from "../controllers/templeUpload.controller";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -68,6 +69,9 @@ router.post("/daily-suggestion-push", requireAdmin, sendDailySuggestionPush);
 router.post("/faqs", requireAdmin, createFaq);
 router.patch("/faqs/:id", requireAdmin, updateFaq);
 router.delete("/faqs/:id", requireAdmin, deleteFaq);
+
+// Temple import (CSV/JSON with merge)
+router.post("/import-temples", requireAdmin, importTemplesCSV);
 
 // App
 router.get("/autocomplete", autocompletePlaces);

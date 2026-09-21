@@ -6,6 +6,7 @@ import { FAMOUS_TEMPLES, FamousTemple } from "../data/famousTemples";
 import { haversineDistance } from "../utils/haversine";
 import { getAreaCoordinates } from "./location.service";
 import { prisma } from "../config/prisma";
+import { googleTextSearch, googleNearbySearch, googlePlaceDetails, isGoogleEnabled } from "./google.service";
 
 export interface TempleResult {
   name: string;
@@ -74,7 +75,28 @@ export async function searchTemples(query: string): Promise<TempleResult[]> {
     }
   } catch {}
 
-  // 2. Search famous temples dataset
+  // 2. Google Places API (if key configured)
+  if (isGoogleEnabled()) {
+    try {
+      const googleResults = await googleTextSearch(query);
+      if (googleResults.length > 0) {
+        const results: TempleResult[] = googleResults.map((g) => ({
+          name: g.name,
+          rating: g.rating,
+          address: g.address,
+          placeId: `google:${g.placeId}`,
+          location: g.lat && g.lon ? { lat: g.lat, lon: g.lon } : null,
+        }));
+        templeCache.set(cacheKey, results);
+        saveTemplesToDB(results).catch(() => {});
+        return results;
+      }
+    } catch (err: any) {
+      console.error("Google search failed:", err.message);
+    }
+  }
+
+  // 3. Search famous temples dataset
   const allTemples = getAllFamousTemples();
 
   const directMatches = allTemples.filter((t) => {
@@ -146,25 +168,64 @@ export async function searchTemples(query: string): Promise<TempleResult[]> {
   return fallback;
 }
 
-// Auto-save temple search results to DB for future lookups
+// Auto-save temple search results to DB with smart merge:
+// 1. Match by exact placeId first
+// 2. Then match by name+city (for cross-source duplicates like google: vs famous:)
+// 3. Merge non-null fields, keeping most complete record
 async function saveTemplesToDB(temples: TempleResult[]): Promise<void> {
   for (const t of temples) {
     try {
       const existing = await prisma.temple.findUnique({ where: { placeId: t.placeId } });
-      if (!existing) {
-        await prisma.temple.create({
+      if (existing) {
+        await prisma.temple.update({
+          where: { id: existing.id },
           data: {
-            name: t.name,
-            placeId: t.placeId,
-            address: t.address,
-            city: t.city || null,
-            state: t.state || null,
-            lat: t.location?.lat || null,
-            lon: t.location?.lon || null,
+            rating: t.rating ?? existing.rating,
+            address: t.address ?? existing.address,
+            city: t.city ?? existing.city,
+            state: t.state ?? existing.state,
+            lat: t.location?.lat ?? existing.lat,
+            lon: t.location?.lon ?? existing.lon,
           },
         });
+        continue;
       }
-    } catch {} // Ignore duplicate placeId errors
+
+      // Cross-source dedup: check if a temple with same name+city exists (different placeId)
+      const dup = await prisma.temple.findFirst({
+        where: {
+          name: t.name,
+          ...(t.city ? { city: t.city } : {}),
+          placeId: { not: t.placeId },
+        },
+      });
+      if (dup) {
+        await prisma.temple.update({
+          where: { id: dup.id },
+          data: {
+            rating: t.rating ?? dup.rating,
+            address: t.address ?? dup.address,
+            lat: t.location?.lat ?? dup.lat,
+            lon: t.location?.lon ?? dup.lon,
+            state: t.state ?? dup.state,
+          },
+        });
+        continue;
+      }
+
+      await prisma.temple.create({
+        data: {
+          name: t.name,
+          placeId: t.placeId,
+          rating: t.rating,
+          address: t.address,
+          city: t.city || null,
+          state: t.state || null,
+          lat: t.location?.lat || null,
+          lon: t.location?.lon || null,
+        },
+      });
+    } catch {}
   }
 }
 

@@ -292,6 +292,10 @@ model Temple {
   state          String?
   lat            Float?
   lon            Float?
+  rating         Float?
+  reviewCount    Int?
+  phone          String?
+  website        String?
   contactDetails String?
   templeHistory  String?
   significance   String?
