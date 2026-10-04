@@ -1,3 +1,4 @@
+import compression from "compression";
 import cors from "cors";
 import express from "express";
 import helmet from "helmet";
@@ -19,36 +20,42 @@ import donationRoutes from "./routes/donation.routes";
 import adminRoutes from "./routes/admin.routes";
 import chatRoutes from "./routes/chat.routes";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
+import { env } from "./config/env";
 
 export const app = express();
 
+// Only trust X-Forwarded-For when actually behind a proxy; otherwise clients could spoof their IP
+// and bypass rate limits.
+if (env.trustProxy) app.set("trust proxy", env.trustProxy);
+app.disable("x-powered-by");
 app.use(helmet({ crossOriginResourcePolicy: false }));
-app.use(cors());
-app.use(express.json());
+// Native apps send no Origin header; restrict browser origins when CORS_ORIGINS is set.
+app.use(cors(env.corsOrigins.length ? { origin: env.corsOrigins } : undefined));
+app.use(compression());
+app.use(express.json({ limit: "5mb" }));
 
+const SENSITIVE = ["password", "passwordHash", "oldPassword", "newPassword", "token", "csv"];
 morgan.token("body", (req: any) => {
-  if (req.method === "POST" || req.method === "PUT" || req.method === "PATCH") {
-    const safe = { ...req.body };
-    if (safe.password) safe.password = "***";
-    if (safe.passwordHash) safe.passwordHash = "***";
-    return JSON.stringify(safe);
-  }
-  return "";
+  if (!["POST", "PUT", "PATCH"].includes(req.method) || !req.body) return "";
+  const safe: Record<string, unknown> = { ...req.body };
+  for (const key of SENSITIVE) if (key in safe) safe[key] = "***";
+  return JSON.stringify(safe).slice(0, 500);
 });
-app.use(morgan(":method :url :status :response-time ms :body"));
+app.use(morgan(env.isProduction ? ":method :url :status :response-time ms" : ":method :url :status :response-time ms :body"));
 
 app.use(
+  "/api",
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 300,
+    max: 1000, // chat screens poll every few seconds
     standardHeaders: true,
     legacyHeaders: false,
+    message: { error: "Too many requests. Please slow down." },
   })
 );
 
-app.get("/health", (_req, res) => res.json({ status: "ok", version: "2.0" }));
-
-app.get("/api/health", (_req, res) => res.json({ status: "ok", version: "2.0" }));
+app.get("/health", (_req, res) => res.json({ status: "ok", version: "2.1" }));
+app.get("/api/health", (_req, res) => res.json({ status: "ok", version: "2.1" }));
 
 app.use("/api/auth", authRoutes);
 app.use("/api/locations", locationRoutes);
@@ -63,6 +70,6 @@ app.use("/api/support", supportRoutes);
 app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/donations", donationRoutes);
 app.use("/api/admin", adminRoutes);
-app.use("/api", chatRoutes);
+app.use("/api/chat", chatRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -1,23 +1,11 @@
 /**
- * Lahiri Ayanamsa calculation.
- * Uses the IAU 2006 precession model to compute the tropical→sidereal offset
- * for a given UTC date. The base epoch is J2000.0 (2000-01-01T12:00:00Z).
+ * Lahiri (Chitrapaksha) ayanamsa for a UTC date.
+ * Value at J2000.0 is 23°51'11" (23.85306°), advancing with general precession
+ * (~50.29"/year) — accurate to well under an arcminute for 1900–2100.
  */
 export function getLahiriAyanamsa(utcDate: Date): number {
-  const J2000 = new Date("2000-01-01T12:00:00Z");
-  const msDiff = utcDate.getTime() - J2000.getTime();
-  const julianCenturies = msDiff / (36525 * 86400000);
-
-  // Precession rate: ~50.29 arcseconds per Julian year ≈ 1.39697° per century
-  // Lahiri offset from J2000 is ~23.86° (this drifts very slowly)
-  const lahariBase = 23.86;
-  const precessionPerCentury = 1.3969737;
-
-  let ayanamsa = lahariBase + precessionPerCentury * julianCenturies;
-
-  // Normalize to 0-360
-  while (ayanamsa < 0) ayanamsa += 360;
-  while (ayanamsa >= 360) ayanamsa -= 360;
-
-  return ayanamsa;
+  const J2000 = Date.UTC(2000, 0, 1, 12, 0, 0);
+  const T = (utcDate.getTime() - J2000) / (36525 * 86400000); // Julian centuries
+  const precessionDeg = (5028.796195 * T + 1.1054348 * T * T) / 3600;
+  return 23.85306 + precessionDeg;
 }

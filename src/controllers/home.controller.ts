@@ -1,14 +1,18 @@
 import { Request, Response } from "express";
 import { catchAsync } from "../utils/catchAsync";
 import { prisma } from "../config/prisma";
+import { getAllFamousTemples } from "../services/temple.service";
 
 export const dashboard = catchAsync(async (_req: Request, res: Response) => {
-  const templeCount = await prisma.bookmark.count().catch(() => 0);
-  const priestCount = await prisma.priest.count().catch(() => 0);
+  const [curatedTemples, priestCount, pujaCount] = await Promise.all([
+    prisma.temple.count({ where: { source: { in: ["upload", "import", "admin"] } } }),
+    prisma.priest.count(),
+    prisma.puja.count({ where: { active: true } }),
+  ]);
 
   res.json({
     greeting: "Namaste",
-    stats: { temples: templeCount, priests: priestCount },
+    stats: { temples: curatedTemples + getAllFamousTemples().length, priests: priestCount, pujas: pujaCount },
     quickLinks: [
       { id: "find-temples", title: "Find Temples", icon: "🛕" },
       { id: "book-priest", title: "Book Priest", icon: "🧑‍🦱" },
@@ -29,16 +33,4 @@ export const dosAndDontsHandler = catchAsync(async (_req: Request, res: Response
     "Follow the queue system and respect the priests.",
     "Do not carry leather items inside the temple.",
   ]);
-});
-
-export const nearbyAlerts = catchAsync(async (_req: Request, res: Response) => {
-  res.json({
-    message: "Nearby temple alerts feature coming soon. Enter your location for localized alerts.",
-  });
-});
-
-export const nearbyEvents = catchAsync(async (_req: Request, res: Response) => {
-  res.json({
-    message: "Nearby temple events feature coming soon. Browse events from our temple database.",
-  });
 });

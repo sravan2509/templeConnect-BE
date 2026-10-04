@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider = "sqlite"
-  url      = "file:./dev.db"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -30,6 +30,8 @@ model User {
   receivedMessages  Message[]             @relation("ToUser")
   resetToken        String?
   resetTokenExpiry  DateTime?
+  resetAttempts     Int                    @default(0)
+  tokenVersion      Int                    @default(0)
   createdAt         DateTime               @default(now())
   updatedAt         DateTime               @updatedAt
 }
@@ -44,6 +46,8 @@ model Notification {
   read      Boolean  @default(false)
   data      String?
   createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
 }
 
 model DailySuggestion {
@@ -81,6 +85,8 @@ model Bookmark {
   lat       Float?
   lon       Float?
   createdAt DateTime  @default(now())
+
+  @@unique([userId, placeId])
 }
 
 model TempleReminder {
@@ -102,6 +108,8 @@ model Checkin {
   lat        Float?
   lon        Float?
   visitedAt  DateTime @default(now())
+
+  @@index([userId, visitedAt])
 }
 
 model Priest {
@@ -175,6 +183,8 @@ model PriestReview {
   rating    Int
   comment   String?
   createdAt DateTime @default(now())
+
+  @@index([priestId, createdAt])
 }
 
 model PriestAvailability {
@@ -203,6 +213,9 @@ model Booking {
   notes       String?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([userId, status])
+  @@index([priestId, status, scheduledAt])
 }
 
 model Donation {
@@ -279,6 +292,9 @@ model Message {
   read       Boolean   @default(false)
   readAt     DateTime?
   createdAt  DateTime  @default(now())
+
+  @@index([fromUserId, toUserId, createdAt])
+  @@index([toUserId, read])
 }
 
 model Temple {
@@ -301,10 +317,20 @@ model Temple {
   significance   String?
   sevas          String?
   websiteLink    String?
+  googlePlaceId  String?       @unique
+  openingHours   String?
+  detailsFetchedAt DateTime?
+  // search = auto-saved from the famous list, google = saved from Google Places,
+  // upload / import / admin = curated by an admin
+  source         String        @default("search")
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   events         TempleEvent[]
   templePujas    TemplePuja[]
+
+  @@index([city])
+  @@index([lat, lon])
+  @@index([source])
 }
 
 model TempleEvent {
@@ -316,6 +342,8 @@ model TempleEvent {
   date        String
   time        String?
   createdAt   DateTime @default(now())
+
+  @@index([date])
 }
 
 model TemplePuja {
@@ -327,4 +355,13 @@ model TemplePuja {
   schedule    String?
   time        String?
   createdAt   DateTime @default(now())
+}
+
+/// Records which external searches have already been made, so repeated searches are served from the DB.
+model TempleSearchLog {
+  id          String   @id @default(uuid())
+  key         String   @unique
+  provider    String
+  resultCount Int
+  fetchedAt   DateTime @default(now())
 }

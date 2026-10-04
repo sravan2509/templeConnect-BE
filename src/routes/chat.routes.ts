@@ -1,14 +1,14 @@
 import { Router } from "express";
 import { requireAuth } from "../middleware/auth";
-import { getMessages, sendMessage, markMessagesRead, submitReview, getChatUsers } from "../controllers/chat.controller";
+import { getMessages, sendMessage, markMessagesRead, getChatUsers } from "../controllers/chat.controller";
 
+// Mounted at /api/chat. Auth is applied per router mount, so unrelated /api paths still 404.
 const router = Router();
 router.use(requireAuth);
 
-router.get("/chat/:userId", getMessages);
-router.post("/chat/:userId", sendMessage);
-router.patch("/chat/:userId/read", markMessagesRead);
-router.get("/chat-users", getChatUsers);
-router.post("/priests/:id/reviews", submitReview);
+router.get("/users", getChatUsers);
+router.get("/:userId", getMessages);
+router.post("/:userId", sendMessage);
+router.patch("/:userId/read", markMessagesRead);
 
 export default router;

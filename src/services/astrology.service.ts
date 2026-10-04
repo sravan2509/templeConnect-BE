@@ -1,14 +1,9 @@
-import { Body, Observer, Equator, Ecliptic } from "astronomy-engine";
+import { EclipticGeoMoon } from "astronomy-engine";
 import { getLahiriAyanamsa } from "../utils/ayanamsa";
+import { timezoneFor, zonedTimeToUtc } from "../utils/timezone";
+import { AppError } from "../utils/AppError";
 import { NAKSHATRAS, Nakshatra } from "../data/nakshatraData";
 import { RASHIS, Rashi } from "../data/rashiData";
-
-export interface BirthChartInput {
-  dob: string;
-  time: string;
-  lat: number;
-  lon: number;
-}
 
 export interface AstroProfile {
   rashi: {
@@ -32,34 +27,51 @@ export interface AstroProfile {
     sidereal: number;
     ayanamsa: number;
   };
+  timezone: string;
+  birthUtc: string;
 }
 
-export function calculateAstroProfile(
-  birthDate: string,
-  birthTime: string,
-  latitude: number,
-  longitude: number
-): AstroProfile {
-  const [year, month, day] = birthDate.split("-").map(Number);
-  const [hour, minute] = birthTime.split(":").map(Number);
+const NAKSHATRA_SPAN = 360 / 27;
+const PADA_SPAN = NAKSHATRA_SPAN / 4;
 
-  const istOffsetMs = 5.5 * 60 * 60 * 1000;
-  const localDate = new Date(year, month - 1, day, hour, minute, 0, 0);
-  const utcDate = new Date(localDate.getTime() - istOffsetMs);
+/** Validates "YYYY-MM-DD" and "HH:MM" and returns their numeric parts. Rejects impossible dates like Feb 31. */
+export function parseBirthDateTime(birthDate: string, birthTime: string) {
+  const d = /^(\d{4})-(\d{2})-(\d{2})$/.exec(birthDate);
+  const t = /^(\d{2}):(\d{2})$/.exec(birthTime);
+  if (!d) throw new AppError("Date of birth must be in YYYY-MM-DD format", 400);
+  if (!t) throw new AppError("Time of birth must be in HH:MM (24-hour) format", 400);
+  const [year, month, day] = [Number(d[1]), Number(d[2]), Number(d[3])];
+  const [hour, minute] = [Number(t[1]), Number(t[2])];
+  const check = new Date(Date.UTC(year, month - 1, day));
+  if (check.getUTCFullYear() !== year || check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day) {
+    throw new AppError("That date does not exist — please check the day and month", 400);
+  }
+  if (year < 1900) throw new AppError("Please enter a birth year from 1900 onwards", 400);
+  if (hour > 23 || minute > 59) throw new AppError("Invalid time of birth", 400);
+  return { year, month, day, hour, minute };
+}
 
-  const observer = new Observer(latitude, longitude, 0);
-  const moonEquatorial = Equator(Body.Moon, utcDate, observer, true, true);
+/**
+ * Computes the Moon's sidereal (Lahiri) position at birth, and from it the
+ * Nakshatra, Pada and Rashi. The birth time is interpreted in the local
+ * timezone of the birthplace (historical offsets included).
+ */
+export function calculateAstroProfile(birthDate: string, birthTime: string, latitude: number, longitude: number): AstroProfile {
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) {
+    throw new AppError("Invalid birth place coordinates", 400);
+  }
+  const { year, month, day, hour, minute } = parseBirthDateTime(birthDate, birthTime);
+  const timezone = timezoneFor(latitude, longitude);
+  const utcDate = zonedTimeToUtc(year, month, day, hour, minute, timezone);
+  if (utcDate.getTime() > Date.now()) throw new AppError("Birth date/time cannot be in the future", 400);
 
-  const moonEcliptic = Ecliptic(moonEquatorial.vec);
-  let tropicalLongitude = moonEcliptic.elon;
-
+  // Geocentric apparent Moon in the ecliptic of date (the standard for Vedic charts).
+  const tropicalLongitude = EclipticGeoMoon(utcDate).lon;
   const ayanamsa = getLahiriAyanamsa(utcDate);
-  let siderealLongitude = tropicalLongitude - ayanamsa;
-  if (siderealLongitude < 0) siderealLongitude += 360;
-  if (siderealLongitude >= 360) siderealLongitude -= 360;
+  const siderealLongitude = (((tropicalLongitude - ayanamsa) % 360) + 360) % 360;
 
   const nakshatra = findNakshatra(siderealLongitude);
-  const pada = findPada(siderealLongitude, nakshatra);
+  const pada = Math.min(4, Math.floor((siderealLongitude - nakshatra.startDeg) / PADA_SPAN) + 1);
   const rashi = findRashi(siderealLongitude);
 
   return {
@@ -84,33 +96,15 @@ export function calculateAstroProfile(
       sidereal: Math.round(siderealLongitude * 1000) / 1000,
       ayanamsa: Math.round(ayanamsa * 1000) / 1000,
     },
+    timezone,
+    birthUtc: utcDate.toISOString(),
   };
 }
 
 function findNakshatra(siderealDeg: number): Nakshatra {
-  for (const n of NAKSHATRAS) {
-    if (siderealDeg >= n.startDeg && siderealDeg < n.endDeg) return n;
-  }
-  return NAKSHATRAS[0];
-}
-
-function findPada(siderealDeg: number, nakshatra: Nakshatra): number {
-  const offset = siderealDeg - nakshatra.startDeg;
-  const padaSize = 13.3333 / 4;
-  return Math.min(4, Math.floor(offset / padaSize) + 1);
+  return NAKSHATRAS[Math.min(26, Math.floor(siderealDeg / NAKSHATRA_SPAN))];
 }
 
 function findRashi(siderealDeg: number): Rashi {
-  for (const r of RASHIS) {
-    if (siderealDeg >= r.startDeg && siderealDeg < r.endDeg) return r;
-  }
-  return RASHIS[0];
-}
-
-export function getNakshatraName(siderealDeg: number): string {
-  return findNakshatra(siderealDeg).name;
-}
-
-export function getRashiName(siderealDeg: number): string {
-  return findRashi(siderealDeg).name;
+  return RASHIS[Math.min(11, Math.floor(siderealDeg / 30))];
 }

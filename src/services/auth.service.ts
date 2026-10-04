@@ -3,41 +3,58 @@ import { prisma } from "../config/prisma";
 import { AppError } from "../utils/AppError";
 import { signToken } from "../utils/jwt";
 
-export async function registerUser(name: string, email: string, password: string) {
-  const lowerEmail = email.toLowerCase();
-  console.log(`[AUTH] Register attempt: ${lowerEmail}`);
-  const existing = await prisma.user.findUnique({ where: { email: lowerEmail } });
-  if (existing) {
-    console.log(`[AUTH] Register failed: ${email} already exists`);
-    throw new AppError("Email already registered", 409);
-  }
+type TokenUser = { id: string; name: string; email: string; role: string; tokenVersion: number };
 
-  const passwordHash = await bcrypt.hash(password, 10);
-  const user = await prisma.user.create({
-    data: { name, email: lowerEmail, passwordHash },
-  });
-
-  const token = signToken({ userId: user.id, role: user.role });
-  console.log(`[AUTH] Register success: ${user.id} role=${user.role}`);
+export function issueSession(user: TokenUser) {
+  const token = signToken({ userId: user.id, role: user.role, tv: user.tokenVersion });
   return { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
 }
 
+export async function registerUser(name: string, email: string, password: string) {
+  const lowerEmail = email.trim().toLowerCase();
+  const existing = await prisma.user.findUnique({ where: { email: lowerEmail } });
+  if (existing) throw new AppError("Email already registered", 409);
+
+  const passwordHash = await bcrypt.hash(password, 10);
+  const user = await prisma.user.create({
+    data: { name: name.trim(), email: lowerEmail, passwordHash },
+  });
+  console.log(`[AUTH] Registered ${user.id} role=${user.role}`);
+  return issueSession(user);
+}
+
+// Per-account throttle on failed logins, so guesses can't be spread across many IPs.
+const MAX_FAILED_LOGINS = 8;
+const LOCKOUT_MS = 15 * 60 * 1000;
+const failedLogins = new Map<string, { count: number; first: number }>();
+
+function assertNotLocked(email: string) {
+  const entry = failedLogins.get(email);
+  if (!entry) return;
+  if (Date.now() - entry.first > LOCKOUT_MS) { failedLogins.delete(email); return; }
+  if (entry.count >= MAX_FAILED_LOGINS) {
+    throw new AppError("Too many failed attempts for this account. Please wait 15 minutes or reset your password.", 429);
+  }
+}
+
+function recordFailedLogin(email: string) {
+  const entry = failedLogins.get(email);
+  if (!entry || Date.now() - entry.first > LOCKOUT_MS) failedLogins.set(email, { count: 1, first: Date.now() });
+  else entry.count++;
+  if (failedLogins.size > 10000) failedLogins.delete(failedLogins.keys().next().value as string);
+}
+
 export async function loginUser(email: string, password: string) {
-  const lowerEmail = email.toLowerCase();
-  console.log(`[AUTH] Login attempt: ${lowerEmail}`);
+  const lowerEmail = email.trim().toLowerCase();
+  assertNotLocked(lowerEmail);
   const user = await prisma.user.findUnique({ where: { email: lowerEmail } });
-  if (!user) {
-    console.log(`[AUTH] Login failed: ${email} not found`);
+  // Compare against a dummy hash when the user is missing so timing doesn't reveal which emails exist.
+  const valid = await bcrypt.compare(password, user?.passwordHash ?? "$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinv");
+  if (!user || !valid) {
+    recordFailedLogin(lowerEmail);
     throw new AppError("Invalid email or password", 401);
   }
-
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) {
-    console.log(`[AUTH] Login failed: wrong password for ${email}`);
-    throw new AppError("Invalid email or password", 401);
-  }
-
-  const token = signToken({ userId: user.id, role: user.role });
-  console.log(`[AUTH] Login success: ${user.id} role=${user.role}`);
-  return { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
+  failedLogins.delete(lowerEmail);
+  console.log(`[AUTH] Login ${user.id} role=${user.role}`);
+  return issueSession(user);
 }

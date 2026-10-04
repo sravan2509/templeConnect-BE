@@ -1,82 +1,97 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
+import { createHash, randomInt } from "crypto";
 import { catchAsync } from "../utils/catchAsync";
-import { loginUser, registerUser } from "../services/auth.service";
+import { issueSession, loginUser, registerUser } from "../services/auth.service";
 import { prisma } from "../config/prisma";
 import { AppError } from "../utils/AppError";
 import { AuthRequest } from "../middleware/auth";
+import { env } from "../config/env";
+import { sendEmail } from "../services/email.service";
+
+const RESET_CODE_TTL_MS = 15 * 60 * 1000;
+const MAX_RESET_ATTEMPTS = 5;
+
+const password = z.string().min(8, "Password must be at least 8 characters").max(128);
 
 const registerSchema = z.object({
-  name: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(8),
+  name: z.string().trim().min(1, "Name is required").max(100),
+  email: z.string().trim().email("Enter a valid email"),
+  password,
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().trim().email("Enter a valid email"),
+  password: z.string().min(1, "Password is required"),
 });
 
-const forgotPasswordSchema = z.object({
-  email: z.string().email(),
-});
+const forgotPasswordSchema = z.object({ email: z.string().trim().email("Enter a valid email") });
 
 const resetPasswordSchema = z.object({
-  email: z.string().email(),
-  token: z.string().min(6),
-  newPassword: z.string().min(8),
+  email: z.string().trim().email(),
+  token: z.string().regex(/^\d{6}$/, "Reset code must be 6 digits"),
+  newPassword: password,
 });
 
 const changePasswordSchema = z.object({
-  oldPassword: z.string().min(1),
-  newPassword: z.string().min(8),
+  oldPassword: z.string().min(1, "Current password is required"),
+  newPassword: password,
 });
+
+const hashCode = (code: string) => createHash("sha256").update(code).digest("hex");
 
 export const register = catchAsync(async (req: Request, res: Response) => {
   const { name, email, password } = registerSchema.parse(req.body);
-  const result = await registerUser(name, email, password);
-  res.status(201).json(result);
+  res.status(201).json(await registerUser(name, email, password));
 });
 
 export const login = catchAsync(async (req: Request, res: Response) => {
   const { email, password } = loginSchema.parse(req.body);
-  const result = await loginUser(email, password);
-  res.status(200).json(result);
+  res.status(200).json(await loginUser(email, password));
 });
 
 export const forgotPassword = catchAsync(async (req: Request, res: Response) => {
   const { email } = forgotPasswordSchema.parse(req.body);
-  const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (!user) throw new AppError("User not found", 404);
+  const lowerEmail = email.toLowerCase();
+  const user = await prisma.user.findUnique({ where: { email: lowerEmail } });
+  // Same response whether or not the account exists, so emails can't be enumerated.
+  const response: Record<string, string> = { message: "If an account exists for this email, a reset code has been sent." };
 
-  const resetToken = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit code
-  const resetTokenExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 mins
+  if (user) {
+    const code = randomInt(0, 1_000_000).toString().padStart(6, "0");
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { resetToken: hashCode(code), resetTokenExpiry: new Date(Date.now() + RESET_CODE_TTL_MS), resetAttempts: 0 },
+    });
+    await sendEmail(lowerEmail, "Your Temple Connect password reset code",
+      `Your password reset code is ${code}. It expires in 15 minutes.\n\nIf you did not request this, you can ignore this email.`);
+    if (env.exposeResetCode) response.devCode = code;
+  }
 
-  await prisma.user.update({
-    where: { id: user.id },
-    data: { resetToken, resetTokenExpiry }
-  });
-
-  // Mock sending email
-  console.log(`[Email Mock] Password reset code for ${email} is ${resetToken}`);
-  
-  res.json({ message: "Reset code generated", code: resetToken });
+  res.json(response);
 });
 
 export const resetPassword = catchAsync(async (req: Request, res: Response) => {
   const { email, token, newPassword } = resetPasswordSchema.parse(req.body);
   const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
-  if (!user) throw new AppError("Invalid request", 400);
+  const invalid = new AppError("Invalid or expired reset code", 400);
+  if (!user || !user.resetToken || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) throw invalid;
 
-  if (user.resetToken !== token || !user.resetTokenExpiry || user.resetTokenExpiry < new Date()) {
-    throw new AppError("Invalid or expired reset code", 400);
+  if (user.resetAttempts >= MAX_RESET_ATTEMPTS) {
+    await prisma.user.update({ where: { id: user.id }, data: { resetToken: null, resetTokenExpiry: null } });
+    throw new AppError("Too many incorrect attempts. Please request a new code.", 429);
+  }
+
+  if (user.resetToken !== hashCode(token)) {
+    await prisma.user.update({ where: { id: user.id }, data: { resetAttempts: { increment: 1 } } });
+    throw invalid;
   }
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash, resetToken: null, resetTokenExpiry: null }
+    data: { passwordHash, resetToken: null, resetTokenExpiry: null, resetAttempts: 0, tokenVersion: { increment: 1 } },
   });
 
   res.json({ message: "Password reset successful" });
@@ -88,13 +103,15 @@ export const changePassword = catchAsync(async (req: AuthRequest, res: Response)
   if (!user) throw new AppError("User not found", 404);
 
   const isValid = await bcrypt.compare(oldPassword, user.passwordHash);
-  if (!isValid) throw new AppError("Incorrect old password", 400);
+  if (!isValid) throw new AppError("Current password is incorrect", 400);
+  if (oldPassword === newPassword) throw new AppError("New password must be different from the current one", 400);
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await prisma.user.update({
+  // Bumping tokenVersion signs out every other session; this device gets a fresh token.
+  const updated = await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash }
+    data: { passwordHash, tokenVersion: { increment: 1 } },
   });
 
-  res.json({ message: "Password changed successfully" });
+  res.json({ message: "Password changed successfully", ...issueSession(updated) });
 });

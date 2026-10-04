@@ -1,111 +1,86 @@
 import { Request, Response } from "express";
 import { z } from "zod";
 import { catchAsync } from "../utils/catchAsync";
-import { calculateAstroProfile, AstroProfile } from "../services/astrology.service";
+import { calculateAstroProfile, parseBirthDateTime } from "../services/astrology.service";
 import { getDeityRecommendation } from "../services/deity.service";
 import { geocodePlace } from "../services/geocode.service";
 import { prisma } from "../config/prisma";
 import { AuthRequest } from "../middleware/auth";
 import { AppError } from "../utils/AppError";
-import { forecastByRashi, getRecommendationsFor } from "../data/mockStore";
+import { forecastByRashi, getRecommendationsFor } from "../data/staticContent";
 
 const birthChartSchema = z.object({
-  dob: z.string().min(1),
-  time: z.string().min(1),
-  place: z.string().min(1),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
+  dob: z.string().trim().min(1, "Date of birth is required"),
+  time: z.string().trim().min(1, "Time of birth is required"),
+  place: z.string().trim().min(2, "Place of birth is required").max(300),
+  lat: z.number().min(-90).max(90).optional(),
+  lng: z.number().min(-180).max(180).optional(),
 });
 
 const completeProfileSchema = z.object({
   birthDate: z.string().min(1),
   birthTime: z.string().min(1),
-  birthLocationName: z.string().min(1),
-  birthLat: z.number(),
-  birthLng: z.number(),
+  birthLocationName: z.string().min(1).max(300),
+  birthLat: z.number().min(-90).max(90),
+  birthLng: z.number().min(-180).max(180),
 });
 
 export const createBirthChart = catchAsync(async (req: AuthRequest, res: Response) => {
   const { dob, time, place, lat: inputLat, lng: inputLng } = birthChartSchema.parse(req.body);
-
-  const user = await prisma.user.findUnique({ where: { id: req.userId! } });
-  if (!user) throw new AppError("User not found. Please logout and login again.", 401);
+  parseBirthDateTime(dob, time); // fail fast on bad input before geocoding
 
   let lat = inputLat;
   let lng = inputLng;
   let placeName = place;
-
   if (lat === undefined || lng === undefined) {
     try {
       const location = await geocodePlace(place);
       lat = location.lat;
       lng = location.lon;
       placeName = location.displayName;
-    } catch (error) {
-      throw new AppError("Could not find coordinates for the given place. Please provide a more specific location or select from suggestions.", 400);
+    } catch {
+      throw new AppError("Could not find that place. Please pick a place from the suggestions.", 400);
     }
   }
 
-  const profile = calculateAstroProfile(dob, time, lat!, lng!);
-
+  const profile = calculateAstroProfile(dob, time, lat, lng);
+  const chartData = { dob, time, placeName, lat, lon: lng, nakshatra: profile.nakshatra.name, rashi: profile.rashi.name };
   const saved = await prisma.birthChart.upsert({
     where: { userId: req.userId! },
-    create: {
-      userId: req.userId!,
-      dob,
-      time,
-      placeName,
-      lat: lat!,
-      lon: lng!,
-      nakshatra: profile.nakshatra.name,
-      rashi: profile.rashi.name,
-    },
-    update: {
-      dob,
-      time,
-      placeName,
-      lat: lat!,
-      lon: lng!,
-      nakshatra: profile.nakshatra.name,
-      rashi: profile.rashi.name,
-    },
+    create: { userId: req.userId!, ...chartData },
+    update: chartData,
   });
 
-  res.status(201).json({
-    ...saved,
-    profile,
-    deityRecommendation: getDeityRecommendation(profile.nakshatra, profile.rashi),
-  });
+  res.status(201).json({ ...saved, profile, deityRecommendation: getDeityRecommendation(profile.nakshatra, profile.rashi) });
 });
 
 export const getBirthChart = catchAsync(async (req: AuthRequest, res: Response) => {
-  const chart = await prisma.birthChart.findUnique({ where: { userId: req.userId! } });
-  res.json(chart);
+  res.json(await prisma.birthChart.findUnique({ where: { userId: req.userId! } }));
 });
 
 export const getAstroProfile = catchAsync(async (req: AuthRequest, res: Response) => {
   const chart = await prisma.birthChart.findUnique({ where: { userId: req.userId! } });
-  if (!chart) return res.status(404).json({ error: "No birth chart found. Please create one first." });
+  if (!chart) throw new AppError("No birth chart found. Please create one first.", 404);
 
   const profile = calculateAstroProfile(chart.dob, chart.time, chart.lat, chart.lon);
-  const deityRec = getDeityRecommendation(profile.nakshatra, profile.rashi);
+  // Keep the stored names in sync if the calculation was corrected since the chart was saved.
+  if (chart.nakshatra !== profile.nakshatra.name || chart.rashi !== profile.rashi.name) {
+    await prisma.birthChart.update({ where: { id: chart.id }, data: { nakshatra: profile.nakshatra.name, rashi: profile.rashi.name } });
+  }
 
   res.json({
-    birthDetails: { date: chart.dob, time: chart.time, place: chart.placeName, lat: chart.lat, lng: chart.lon },
+    birthDetails: { date: chart.dob, time: chart.time, place: chart.placeName, lat: chart.lat, lng: chart.lon, timezone: profile.timezone },
     rashi: profile.rashi,
     nakshatra: profile.nakshatra,
     moonLongitude: profile.moonLongitude,
-    deityRecommendation: deityRec,
+    deityRecommendation: getDeityRecommendation(profile.nakshatra, profile.rashi),
   });
 });
 
 export const getForecast = catchAsync(async (req: AuthRequest, res: Response) => {
   const chart = await prisma.birthChart.findUnique({ where: { userId: req.userId! } });
   const rashi = chart?.rashi ?? null;
-  res.json({
-    rashi,
-    forecast: (rashi && forecastByRashi[rashi]) ?? "Add your birth details to get a personalized forecast.",
-  });
+  res.json({ rashi, forecast: (rashi && forecastByRashi[rashi]) ?? "Add your birth details to get a personalized forecast." });
 });
 
 export const getRecommendations = catchAsync(async (req: AuthRequest, res: Response) => {
@@ -115,24 +90,16 @@ export const getRecommendations = catchAsync(async (req: AuthRequest, res: Respo
 
 export const completeRecommendation = catchAsync(async (req: Request, res: Response) => {
   const { birthDate, birthTime, birthLocationName, birthLat, birthLng } = completeProfileSchema.parse(req.body);
-
   const profile = calculateAstroProfile(birthDate, birthTime, birthLat, birthLng);
-  const deityRec = getDeityRecommendation(profile.nakshatra, profile.rashi);
 
   res.json({
     success: true,
     data: {
-      birthDetails: {
-        date: birthDate,
-        time: birthTime,
-        location: birthLocationName,
-        coordinates: { lat: birthLat, lng: birthLng },
-      },
+      birthDetails: { date: birthDate, time: birthTime, location: birthLocationName, coordinates: { lat: birthLat, lng: birthLng }, timezone: profile.timezone },
       rashi: profile.rashi,
       nakshatra: profile.nakshatra,
       moonLongitude: profile.moonLongitude,
-      deityRecommendation: deityRec,
+      deityRecommendation: getDeityRecommendation(profile.nakshatra, profile.rashi),
     },
   });
 });
-

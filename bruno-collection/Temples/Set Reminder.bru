@@ -6,13 +6,21 @@ meta {
 
 post {
   url: {{baseUrl}}/api/temples/:placeId/reminders
+  body: json
   auth: bearer
 }
 
 params:path {
-  placeId: mock-place-1
+  placeId: famous:Somnath Temple
 }
 
 auth:bearer {
   token: {{authToken}}
+}
+
+body:json {
+  {
+    "remindAt": "2027-01-01T06:00:00+05:30",
+    "eventName": "Morning darshan"
+  }
 }

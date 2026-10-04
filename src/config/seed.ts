@@ -5,7 +5,11 @@ import { calculateAstroProfile } from "../services/astrology.service";
 async function seed() {
   console.log("🌱 Seeding Temple Connect...\n");
 
-  // ── Admin ──
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Refusing to seed demo accounts with known passwords in production");
+  }
+
+  // ── Admin ──  (demo credentials — development only)
   const adminHash = await bcrypt.hash("admin123", 10);
   await prisma.user.upsert({
     where: { email: "admin@templeconnect.com" },
@@ -92,9 +96,15 @@ async function seed() {
     { userId: "dev-005", priestId: "priest-001", pujaId: "puja-005", scheduled: 7, status: "pending", paid: false },
     { userId: "dev-005", priestId: "priest-005", pujaId: "puja-004", scheduled: -3, status: "completed", paid: true },
   ];
-  for (const b of bookingsData) {
+  // Fixed ids keep the seed idempotent: re-running it does not duplicate bookings.
+  for (const [i, b] of bookingsData.entries()) {
     const puja = await prisma.puja.findUnique({ where: { id: b.pujaId } });
-    await prisma.booking.create({ data: { userId: b.userId, priestId: b.priestId, pujaId: b.pujaId, scheduledAt: new Date(now.getTime() + b.scheduled * 86400000), status: b.status, paid: b.paid, amount: puja?.basePrice || 1000 } });
+    const id = `seed-booking-${String(i + 1).padStart(3, "0")}`;
+    await prisma.booking.upsert({
+      where: { id },
+      update: {},
+      create: { id, userId: b.userId, priestId: b.priestId, pujaId: b.pujaId, scheduledAt: new Date(now.getTime() + b.scheduled * 86400000), status: b.status, paid: b.paid, amount: puja?.basePrice || 1000 },
+    });
   }
   console.log("✅ 10 Bookings");
 
@@ -102,7 +112,7 @@ async function seed() {
   for (const f of [
     { question: "How do I book a puja?", answer: "Go to Connect tab → Book a Puja → Select puja → Choose priest → Confirm. The priest will then accept or suggest another time.", category: "general", order: 1 },
     { question: "How to get my astrology profile?", answer: "Home tab → Enter Birth Details → Calculate. Your Nakshatra, Rashi, and recommended deity will be shown.", category: "general", order: 2 },
-    { question: "Can I cancel a booking?", answer: "From My Bookings, tap on a pending booking to cancel. Free if 24hrs before the scheduled time.", category: "general", order: 3 },
+    { question: "Can I cancel a booking?", answer: "Pending requests can be cancelled any time from My Bookings. Confirmed bookings can be cancelled up to 24 hours before the scheduled time.", category: "general", order: 3 },
   ]) { await prisma.faq.deleteMany({ where: { question: f.question } }); await prisma.faq.create({ data: f }); }
 
   // ── Daily suggestions ──
@@ -115,6 +125,6 @@ async function seed() {
 
   const counts = { users: await prisma.user.count(), pujas: await prisma.puja.count(), priests: await prisma.priest.count(), bookings: await prisma.booking.count() };
   console.log(`\n✅ Done! Users:${counts.users} Pujas:${counts.pujas} Priests:${counts.priests} Bookings:${counts.bookings}\n`);
-  process.exit(0);
+  await prisma.$disconnect();
 }
 seed().catch(e => { console.error(e); process.exit(1); });

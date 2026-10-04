@@ -6,9 +6,16 @@ meta {
 
 delete {
   url: {{baseUrl}}/api/users/me
+  body: json
   auth: bearer
 }
 
 auth:bearer {
   token: {{authToken}}
+}
+
+body:json {
+  {
+    "password": "password123"
+  }
 }

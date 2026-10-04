@@ -5,8 +5,8 @@ const prisma = new PrismaClient();
 async function makeAdmin(email: string) {
   try {
     const user = await prisma.user.update({
-      where: { email },
-      data: { role: "admin" }
+      where: { email: email.trim().toLowerCase() },
+      data: { role: "admin", tokenVersion: { increment: 1 } }
     });
     console.log(`Successfully promoted ${user.name} (${user.email}) to admin.`);
   } catch (err: any) {

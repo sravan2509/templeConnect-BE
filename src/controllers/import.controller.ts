@@ -1,21 +1,34 @@
 import { Response } from "express";
+import { parse } from "csv-parse/sync";
 import { catchAsync } from "../utils/catchAsync";
 import { AuthRequest } from "../middleware/auth";
+import { AppError } from "../utils/AppError";
 import { prisma } from "../config/prisma";
 import { googleTextSearch, isGoogleEnabled } from "../services/google.service";
+import { clearTempleCache } from "../services/temple.service";
+import { safeWebsite, templePlaceId } from "./templeUpload.controller";
+import { findMatchingTemple, mergeTempleData } from "../services/templeMatcher.service";
+
+const MAX_ROWS = 2000;
 
 function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
-  if (lines.length < 2) return [];
-  const headers = lines[0].split(",").map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ""));
-  const rows: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = lines[i].split(",").map((c) => c.trim().replace(/^"|"$/g, ""));
-    const row: Record<string, string> = {};
-    headers.forEach((h, idx) => { row[h] = cells[idx] ?? ""; });
-    rows.push(row);
+  try {
+    return parse(text, {
+      columns: (header: string[]) => header.map((h) => h.trim().toLowerCase()),
+      skip_empty_lines: true,
+      trim: true,
+      relax_column_count: true,
+      bom: true,
+    });
+  } catch (err: any) {
+    throw new AppError(`Could not parse CSV: ${err.message}`, 400);
   }
-  return rows;
+}
+
+function num(value: string | undefined, max: number): number | null {
+  if (!value) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && Math.abs(n) <= max ? n : null;
 }
 
 function extractTempleFields(row: Record<string, string>) {
@@ -25,10 +38,10 @@ function extractTempleFields(row: Record<string, string>) {
     state: row.state || "",
     deity: row.deity || row.deity_name || row.god || "",
     address: row.address || row.full_address || "",
-    lat: parseFloat(row.lat || row.latitude || "NaN") || null,
-    lon: parseFloat(row.lon || row.lng || row.longitude || "NaN") || null,
+    lat: num(row.lat || row.latitude, 90),
+    lon: num(row.lon || row.lng || row.longitude, 180),
     phone: row.phone || row.contact || row.contact_details || "",
-    website: row.website || row.website_link || row.site || "",
+    website: safeWebsite(row.website || row.website_link || row.site) ?? "",
     history: row.history || row.temple_history || row.description || "",
     significance: row.significance || row.speciality || "",
     sevas: row.sevas || row.pujas || row.services || "",
@@ -36,20 +49,18 @@ function extractTempleFields(row: Record<string, string>) {
 }
 
 export const importTemplesCSV = catchAsync(async (req: AuthRequest, res: Response) => {
-  const { csv } = req.body as { csv?: string };
-  const { rows: jsonRows } = req.body as { rows?: Record<string, string>[] };
+  const { csv, rows: jsonRows } = req.body as { csv?: unknown; rows?: unknown };
 
-  let records: Record<string, string>[] = [];
-
-  if (csv && typeof csv === "string") {
+  let records: Record<string, string>[];
+  if (typeof csv === "string" && csv.trim()) {
     records = parseCSV(csv);
   } else if (Array.isArray(jsonRows)) {
-    records = jsonRows;
+    records = jsonRows.map((r) => Object.fromEntries(Object.entries(r ?? {}).map(([k, v]) => [k.toLowerCase(), String(v ?? "").trim()])));
   } else {
-    return res.status(400).json({ error: "Provide either csv (string) or rows (array of objects)" });
+    throw new AppError("Provide either csv (string) or rows (array of objects)", 400);
   }
-
-  if (records.length === 0) return res.status(400).json({ error: "No rows found in upload" });
+  if (records.length === 0) throw new AppError("No rows found in upload", 400);
+  if (records.length > MAX_ROWS) throw new AppError(`Please import at most ${MAX_ROWS} rows at a time`, 400);
 
   let created = 0, merged = 0, skipped = 0, googleEnriched = 0;
   const imported: any[] = [];
@@ -58,68 +69,47 @@ export const importTemplesCSV = catchAsync(async (req: AuthRequest, res: Respons
     const f = extractTempleFields(raw);
     if (!f.name || !f.city) { skipped++; continue; }
 
-    const key = `${f.name.toLowerCase().trim()}::${f.city.toLowerCase().trim()}`;
+    // Same temple already stored (uploaded, imported, or saved from a Google search)? Merge into it:
+    // imported values win, blank cells leave stored values untouched.
+    const matchInput = () => ({ name: f.name, city: f.city, address: f.address, lat: f.lat, lon: f.lon, placeId: templePlaceId(f.name, f.city) });
+    let existing = await findMatchingTemple(matchInput());
 
-    // 1. Find existing by exact name+city (any source)
-    const existing = await prisma.temple.findFirst({
-      where: { name: { contains: f.name }, city: { contains: f.city } },
-    });
-
-    // 2. Optionally enrich from Google if missing lat/lon and key present
-    if ((!f.lat || !f.lon) && isGoogleEnabled()) {
+    // Look up coordinates on Google only when neither the row nor the stored temple has them.
+    if ((f.lat === null || f.lon === null) && existing?.lat == null && isGoogleEnabled()) {
       try {
-        const gResults = await googleTextSearch(`${f.name} ${f.city}`);
-        if (gResults.length > 0) {
-          const best = gResults[0];
-          if (!f.lat) f.lat = best.lat;
-          if (!f.lon) f.lon = best.lon;
-          if (!f.phone) f.phone = best.phone || "";
+        const [best] = await googleTextSearch(`${f.name} ${f.city}`);
+        if (best?.lat != null && best?.lon != null) {
+          f.lat ??= best.lat;
+          f.lon ??= best.lon;
           googleEnriched++;
+          existing ??= await findMatchingTemple(matchInput());
         }
       } catch {}
     }
 
     if (existing) {
-      // 3. MERGE: fill only missing fields on existing record
-      await prisma.temple.update({
-        where: { id: existing.id },
-        data: {
-          deityName: existing.deityName || f.deity || null,
-          address: existing.address || f.address || null,
-          lat: existing.lat ?? f.lat,
-          lon: existing.lon ?? f.lon,
-          contactDetails: existing.contactDetails || f.phone || null,
-          websiteLink: existing.websiteLink || f.website || null,
-          templeHistory: existing.templeHistory || f.history || null,
-          significance: existing.significance || f.significance || null,
-          sevas: existing.sevas || f.sevas || null,
-        },
-      });
+      const fields = {
+        name: f.name, city: f.city, state: f.state || null, deityName: f.deity || null, address: f.address || null,
+        lat: f.lat, lon: f.lon, contactDetails: f.phone || null, websiteLink: f.website || null,
+        templeHistory: f.history || null, significance: f.significance || null, sevas: f.sevas || null,
+      };
+      await prisma.temple.update({ where: { id: existing.id }, data: { ...mergeTempleData(existing, fields, "import"), source: existing.source === "upload" || existing.source === "admin" ? existing.source : "import" } });
       merged++;
-      imported.push({ ...f, status: "merged", id: existing.id });
+      imported.push({ name: f.name, city: f.city, status: "merged", into: existing.name, id: existing.id });
     } else {
-      // 4. CREATE new record
-      const createdRow = await prisma.temple.create({
+      const row = await prisma.temple.create({
         data: {
-          name: f.name,
-          placeId: `csv:${key}`,
-          deityName: f.deity || null,
-          address: f.address || null,
-          city: f.city,
-          state: f.state || null,
-          lat: f.lat,
-          lon: f.lon,
-          contactDetails: f.phone || null,
-          websiteLink: f.website || null,
-          templeHistory: f.history || null,
-          significance: f.significance || null,
-          sevas: f.sevas || null,
+          name: f.name, placeId: templePlaceId(f.name, f.city), source: "import",
+          deityName: f.deity || null, address: f.address || null, city: f.city, state: f.state || null,
+          lat: f.lat, lon: f.lon, contactDetails: f.phone || null, websiteLink: f.website || null,
+          templeHistory: f.history || null, significance: f.significance || null, sevas: f.sevas || null,
         },
       });
       created++;
-      imported.push({ ...f, status: "created", id: createdRow.id });
+      imported.push({ name: f.name, city: f.city, status: "created", id: row.id });
     }
   }
 
+  clearTempleCache();
   res.status(200).json({ success: true, created, merged, skipped, googleEnriched, imported });
 });

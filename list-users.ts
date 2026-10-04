@@ -9,8 +9,8 @@ async function listUsers() {
         id: true,
         email: true,
         name: true,
-        passwordHash: true,
-        role: true
+        role: true,
+        createdAt: true
       }
     });
     

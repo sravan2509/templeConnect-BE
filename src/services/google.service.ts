@@ -23,6 +23,7 @@ export function isGoogleEnabled(): boolean {
 
 export async function googleTextSearch(query: string): Promise<GoogleTemple[]> {
   if (!isGoogleEnabled()) return [];
+  console.log(`[GOOGLE] textsearch "${query}"`);
   const { data } = await axios.get(`${BASE}/textsearch/json`, {
     params: { query: `${query} temple`, key: env.googleMapsApiKey },
     timeout: 10000,
@@ -35,6 +36,7 @@ export async function googleTextSearch(query: string): Promise<GoogleTemple[]> {
 
 export async function googleNearbySearch(lat: number, lng: number, radiusM: number, keyword?: string): Promise<GoogleTemple[]> {
   if (!isGoogleEnabled()) return [];
+  console.log(`[GOOGLE] nearbysearch ${lat.toFixed(3)},${lng.toFixed(3)} r=${radiusM} kw=${keyword ?? "-"}`);
   const params: any = {
     location: `${lat},${lng}`,
     radius: radiusM,
@@ -49,8 +51,9 @@ export async function googleNearbySearch(lat: number, lng: number, radiusM: numb
   return (data.results ?? []).map(mapGoogleResult);
 }
 
-export async function googlePlaceDetails(placeId: string): Promise<Partial<GoogleTemple> & { openingHours?: any; photos?: string[] }> {
+export async function googlePlaceDetails(placeId: string): Promise<Partial<GoogleTemple> & { openingHours?: string[] | null; photos?: string[] }> {
   if (!isGoogleEnabled()) return {};
+  console.log(`[GOOGLE] details ${placeId}`);
   const { data } = await axios.get(`${BASE}/details/json`, {
     params: { place_id: placeId, fields: "name,formatted_address,geometry,rating,user_ratings_total,formatted_phone_number,website,opening_hours,photos", key: env.googleMapsApiKey },
     timeout: 10000,
