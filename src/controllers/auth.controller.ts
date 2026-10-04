@@ -9,6 +9,7 @@ import { AppError } from "../utils/AppError";
 import { AuthRequest } from "../middleware/auth";
 import { env } from "../config/env";
 import { sendEmail } from "../services/email.service";
+import { continueWithGoogle } from "../services/googleAuth.service";
 
 const RESET_CODE_TTL_MS = 15 * 60 * 1000;
 const MAX_RESET_ATTEMPTS = 5;
@@ -35,7 +36,8 @@ const resetPasswordSchema = z.object({
 });
 
 const changePasswordSchema = z.object({
-  oldPassword: z.string().min(1, "Current password is required"),
+  // Optional only for Google accounts that don't have a password yet.
+  oldPassword: z.string().optional(),
   newPassword: password,
 });
 
@@ -102,9 +104,13 @@ export const changePassword = catchAsync(async (req: AuthRequest, res: Response)
   const user = await prisma.user.findUnique({ where: { id: req.userId! } });
   if (!user) throw new AppError("User not found", 404);
 
-  const isValid = await bcrypt.compare(oldPassword, user.passwordHash);
-  if (!isValid) throw new AppError("Current password is incorrect", 400);
-  if (oldPassword === newPassword) throw new AppError("New password must be different from the current one", 400);
+  if (user.passwordHash) {
+    if (!oldPassword) throw new AppError("Current password is required", 400);
+    const isValid = await bcrypt.compare(oldPassword, user.passwordHash);
+    if (!isValid) throw new AppError("Current password is incorrect", 400);
+    if (oldPassword === newPassword) throw new AppError("New password must be different from the current one", 400);
+  }
+  // Google-only accounts (no password yet) are already signed in, so they can set one directly.
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
   // Bumping tokenVersion signs out every other session; this device gets a fresh token.
@@ -113,5 +119,11 @@ export const changePassword = catchAsync(async (req: AuthRequest, res: Response)
     data: { passwordHash, tokenVersion: { increment: 1 } },
   });
 
-  res.json({ message: "Password changed successfully", ...issueSession(updated) });
+  res.json({ message: user.passwordHash ? "Password changed successfully" : "Password set successfully", ...issueSession(updated) });
+});
+
+export const googleSignIn = catchAsync(async (req: Request, res: Response) => {
+  const { idToken } = z.object({ idToken: z.string().min(20, "Missing Google token").max(5000) }).parse(req.body);
+  const result = await continueWithGoogle(idToken);
+  res.status(result.isNewUser ? 201 : 200).json(result);
 });

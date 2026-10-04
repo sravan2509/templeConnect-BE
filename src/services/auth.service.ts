@@ -3,11 +3,22 @@ import { prisma } from "../config/prisma";
 import { AppError } from "../utils/AppError";
 import { signToken } from "../utils/jwt";
 
-type TokenUser = { id: string; name: string; email: string; role: string; tokenVersion: number };
+type TokenUser = {
+  id: string; name: string; email: string; role: string; tokenVersion: number;
+  passwordHash: string | null; googleId: string | null; avatarUrl: string | null;
+};
+
+/** Public profile shape returned to the app (never the hash or Google ID themselves). */
+export function publicUser(user: TokenUser) {
+  return {
+    id: user.id, name: user.name, email: user.email, role: user.role,
+    hasPassword: !!user.passwordHash, googleLinked: !!user.googleId, avatarUrl: user.avatarUrl,
+  };
+}
 
 export function issueSession(user: TokenUser) {
   const token = signToken({ userId: user.id, role: user.role, tv: user.tokenVersion });
-  return { token, user: { id: user.id, name: user.name, email: user.email, role: user.role } };
+  return { token, user: publicUser(user) };
 }
 
 export async function registerUser(name: string, email: string, password: string) {
@@ -50,6 +61,9 @@ export async function loginUser(email: string, password: string) {
   const user = await prisma.user.findUnique({ where: { email: lowerEmail } });
   // Compare against a dummy hash when the user is missing so timing doesn't reveal which emails exist.
   const valid = await bcrypt.compare(password, user?.passwordHash ?? "$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinv");
+  if (user && !user.passwordHash && user.googleId) {
+    throw new AppError('This account uses Google sign-in. Tap "Continue with Google", or use "Forgot password" to set a password.', 400);
+  }
   if (!user || !valid) {
     recordFailedLogin(lowerEmail);
     throw new AppError("Invalid email or password", 401);

@@ -41,4 +41,6 @@ export const env = {
   nominatimBaseUrl: optional("NOMINATIM_BASE_URL", "https://nominatim.openstreetmap.org"),
   nominatimUserAgent: optional("NOMINATIM_USER_AGENT", "temple-connect-app (contact@example.com)"),
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
+  // OAuth client IDs (web, Android, iOS) whose Google ID tokens we accept for "Continue with Google".
+  googleClientIds: (process.env.GOOGLE_OAUTH_CLIENT_IDS ?? "").split(",").map((c) => c.trim()).filter(Boolean),
 };

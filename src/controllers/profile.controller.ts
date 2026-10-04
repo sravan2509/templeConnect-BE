@@ -6,12 +6,20 @@ import { AuthRequest } from "../middleware/auth";
 import { AppError } from "../utils/AppError";
 import { prisma } from "../config/prisma";
 
-const meSelect = { id: true, name: true, email: true, role: true, createdAt: true } as const;
+const meSelect = { id: true, name: true, email: true, role: true, createdAt: true, passwordHash: true, googleId: true, avatarUrl: true } as const;
+
+type MeRow = { id: string; name: string; email: string; role: string; createdAt: Date; passwordHash: string | null; googleId: string | null; avatarUrl: string | null };
+
+/** Never send the password hash or Google ID to the app, only whether they exist. */
+function toMe(u: MeRow) {
+  const { passwordHash, googleId, ...rest } = u;
+  return { ...rest, hasPassword: !!passwordHash, googleLinked: !!googleId };
+}
 
 export const getMe = catchAsync(async (req: AuthRequest, res: Response) => {
   const user = await prisma.user.findUnique({ where: { id: req.userId! }, select: meSelect });
   if (!user) throw new AppError("User not found", 404);
-  res.json(user);
+  res.json(toMe(user));
 });
 
 export const updateMe = catchAsync(async (req: AuthRequest, res: Response) => {
@@ -22,15 +30,21 @@ export const updateMe = catchAsync(async (req: AuthRequest, res: Response) => {
     await tx.priest.updateMany({ where: { userId: req.userId! }, data: { name } });
     return u;
   });
-  res.json(user);
+  res.json(toMe(user));
 });
 
 /** Permanently deletes the account. Requires the current password. */
 export const deleteAccount = catchAsync(async (req: AuthRequest, res: Response) => {
-  const { password } = z.object({ password: z.string().min(1, "Enter your password to confirm") }).parse(req.body ?? {});
+  const { password, confirmText } = z.object({ password: z.string().optional(), confirmText: z.string().optional() }).parse(req.body ?? {});
   const user = await prisma.user.findUnique({ where: { id: req.userId! }, include: { priestProfile: true } });
   if (!user) throw new AppError("User not found", 404);
-  if (!(await bcrypt.compare(password, user.passwordHash))) throw new AppError("Incorrect password", 400);
+  if (user.passwordHash) {
+    if (!password) throw new AppError("Enter your password to confirm", 400);
+    if (!(await bcrypt.compare(password, user.passwordHash))) throw new AppError("Incorrect password", 400);
+  } else if (confirmText?.trim().toUpperCase() !== "DELETE") {
+    // Google-only accounts have no password; typing DELETE confirms instead.
+    throw new AppError("Type DELETE to confirm", 400);
+  }
   if (user.role === "admin" && (await prisma.user.count({ where: { role: "admin" } })) <= 1) {
     throw new AppError("You are the only admin. Promote another admin before deleting this account.", 400);
   }

@@ -1,6 +1,6 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { login, register, forgotPassword, resetPassword, changePassword } from "../controllers/auth.controller";
+import { login, register, forgotPassword, resetPassword, changePassword, googleSignIn } from "../controllers/auth.controller";
 import { requireAuth } from "../middleware/auth";
 
 const router = Router();
@@ -19,6 +19,7 @@ const limiter = (max: number, windowMinutes: number) =>
 
 router.post("/register", limiter(10, 60), register);
 router.post("/login", limiter(10, 15), login);
+router.post("/google", limiter(20, 15), googleSignIn);
 router.post("/forgot-password", limiter(5, 60), forgotPassword);
 router.post("/reset-password", limiter(10, 15), resetPassword);
 router.post("/change-password", requireAuth, limiter(10, 15), changePassword);
