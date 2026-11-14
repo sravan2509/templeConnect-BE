@@ -19,6 +19,12 @@ import subscriptionRoutes from "./routes/subscription.routes";
 import donationRoutes from "./routes/donation.routes";
 import adminRoutes from "./routes/admin.routes";
 import chatRoutes from "./routes/chat.routes";
+import portalRoutes from "./routes/portal.routes";
+import communityRoutes from "./routes/community.routes";
+import serviceBookingRoutes from "./routes/serviceBooking.routes";
+import paymentRoutes from "./routes/payments.routes";
+import { razorpayWebhook } from "./controllers/serviceBooking.controller";
+import { LOCAL_UPLOAD_DIR } from "./services/storage.service";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { env } from "./config/env";
 
@@ -32,7 +38,11 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 // Native apps send no Origin header; restrict browser origins when CORS_ORIGINS is set.
 app.use(cors(env.corsOrigins.length ? { origin: env.corsOrigins } : undefined));
 app.use(compression());
+// Razorpay signs the raw body, so the webhook must be parsed before express.json().
+app.post("/api/payments/razorpay/webhook", express.raw({ type: "application/json", limit: "1mb" }), razorpayWebhook);
 app.use(express.json({ limit: "5mb" }));
+// Images stored on disk when S3 isn't configured.
+app.use("/uploads", express.static(LOCAL_UPLOAD_DIR, { maxAge: "30d", immutable: true, fallthrough: false }));
 
 const SENSITIVE = ["password", "passwordHash", "oldPassword", "newPassword", "token", "csv"];
 morgan.token("body", (req: any) => {
@@ -71,5 +81,9 @@ app.use("/api/subscriptions", subscriptionRoutes);
 app.use("/api/donations", donationRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/chat", chatRoutes);
+app.use("/api/portal", portalRoutes);
+app.use("/api/community", communityRoutes);
+app.use("/api/service-bookings", serviceBookingRoutes);
+app.use("/api/payments", paymentRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);

@@ -18,6 +18,7 @@ import { listKbArticles, createKbArticle, updateKbArticle, deleteKbArticle } fro
 import { importTemplesCSV } from "../controllers/import.controller";
 import { downloadTemplate, uploadTemples, listAllTemples, updateTemple, deleteTemple } from "../controllers/templeUpload.controller";
 import { addTempleEvent, addTemplePuja, deleteTempleEvent, deleteTemplePuja } from "../controllers/templeAdmin.controller";
+import * as superAdmin from "../controllers/superAdmin.controller";
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
@@ -26,6 +27,25 @@ const router = Router();
 router.use(requireAuth);
 
 router.get("/dashboard", requireAdmin, adminDashboard);
+
+// Temple admin accounts
+router.get("/temple-admins", requireAdmin, superAdmin.listTempleAdmins);
+router.post("/temple-admins", requireAdmin, superAdmin.createTempleAdmin);
+router.post("/temple-admins/:userId/reset-password", requireAdmin, superAdmin.resetTempleAdminPassword);
+router.delete("/temple-admins/:userId", requireAdmin, superAdmin.removeTempleAdmin);
+
+// Standalone festivals (Pushkaraalu). Their poojas & bookings are managed via /api/portal?festivalId=
+router.get("/festivals", requireAdmin, superAdmin.listFestivalsAdmin);
+router.post("/festivals", requireAdmin, superAdmin.createFestival);
+router.patch("/festivals/:id", requireAdmin, superAdmin.updateFestival);
+router.delete("/festivals/:id", requireAdmin, superAdmin.deleteFestival);
+router.post("/festivals/:id/ghats", requireAdmin, superAdmin.addGhat);
+router.patch("/ghats/:ghatId", requireAdmin, superAdmin.updateGhat);
+router.delete("/ghats/:ghatId", requireAdmin, superAdmin.deleteGhat);
+
+// Audit history & broadcast notifications
+router.get("/audit", requireAdmin, superAdmin.globalAudit);
+router.post("/broadcast", requireAdmin, superAdmin.broadcast);
 
 // Knowledge base
 router.get("/kb", requireAdmin, listKbArticles);

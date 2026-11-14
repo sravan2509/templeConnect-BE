@@ -8,14 +8,14 @@ datasource db {
 }
 
 model User {
-  id                String                 @id @default(uuid())
+  id                String                  @id @default(uuid())
   name              String
-  email             String                 @unique
+  email             String                  @unique
   // Null for accounts created with "Continue with Google" until the user sets a password.
   passwordHash      String?
-  googleId          String?                @unique
+  googleId          String?                 @unique
   avatarUrl         String?
-  role              String                 @default("devotee")
+  role              String                  @default("devotee")
   pushToken         String?
   priestProfile     Priest?
   birthChart        BirthChart?
@@ -29,14 +29,24 @@ model User {
   notificationPrefs NotificationPreference?
   reviewsWritten    PriestReview[]
   notifications     Notification[]
-  sentMessages      Message[]             @relation("FromUser")
-  receivedMessages  Message[]             @relation("ToUser")
+  sentMessages      Message[]               @relation("FromUser")
+  receivedMessages  Message[]               @relation("ToUser")
+  templeStaff       TempleStaff?
+  templeFollows     TempleFollow[]
+  communityAreas    CommunityArea[]
+  serviceBookings   ServiceBooking[]
+  eventResponses    EventResponse[]
+  // Saved home location + radius for "events near me" notifications.
+  homeLat           Float?
+  homeLon           Float?
+  homeLabel         String?
+  communityRadiusKm Int?
   resetToken        String?
   resetTokenExpiry  DateTime?
-  resetAttempts     Int                    @default(0)
-  tokenVersion      Int                    @default(0)
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  resetAttempts     Int                     @default(0)
+  tokenVersion      Int                     @default(0)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
 }
 
 model Notification {
@@ -79,27 +89,27 @@ model BirthChart {
 }
 
 model Bookmark {
-  id        String    @id @default(uuid())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   placeId   String
   name      String
   address   String?
   lat       Float?
   lon       Float?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   @@unique([userId, placeId])
 }
 
 model TempleReminder {
-  id        String    @id @default(uuid())
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId    String
   placeId   String
   eventName String?
   remindAt  DateTime
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 }
 
 model Checkin {
@@ -116,48 +126,48 @@ model Checkin {
 }
 
 model Priest {
-  id              String               @id @default(uuid())
-  user            User?                @relation(fields: [userId], references: [id])
-  userId          String?              @unique
-  name            String
-  phone           String?
-  specialization  String               @default("")
-  languages       String               @default("")
-  rating          Float                @default(0)
-  reviewCount     Int                  @default(0)
-  verified        Boolean              @default(false)
-  experienceYears Int                  @default(0)
-  qualifications  String               @default("")
-  bio             String?
-  avatar          String?
-  services        PriestService[]
-  priestPujas     PriestPuja[]
-  reviews         PriestReview[]
-  availability    PriestAvailability[]
+  id               String               @id @default(uuid())
+  user             User?                @relation(fields: [userId], references: [id])
+  userId           String?              @unique
+  name             String
+  phone            String?
+  specialization   String               @default("")
+  languages        String               @default("")
+  rating           Float                @default(0)
+  reviewCount      Int                  @default(0)
+  verified         Boolean              @default(false)
+  experienceYears  Int                  @default(0)
+  qualifications   String               @default("")
+  bio              String?
+  avatar           String?
+  services         PriestService[]
+  priestPujas      PriestPuja[]
+  reviews          PriestReview[]
+  availability     PriestAvailability[]
   bookingsReceived Booking[]
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 }
 
 model Puja {
-  id          String      @id @default(uuid())
-  name        String      @unique
+  id          String       @id @default(uuid())
+  name        String       @unique
   description String?
-  duration    String      @default("60 mins")
-  basePrice   Float       @default(1000)
-  category    String      @default("general")
-  icon        String      @default("🛕")
-  active      Boolean     @default(true)
+  duration    String       @default("60 mins")
+  basePrice   Float        @default(1000)
+  category    String       @default("general")
+  icon        String       @default("🛕")
+  active      Boolean      @default(true)
   priestPujas PriestPuja[]
   bookings    Booking[]
-  createdAt   DateTime    @default(now())
+  createdAt   DateTime     @default(now())
 }
 
 model PriestPuja {
-  id        String  @id @default(uuid())
-  priest    Priest  @relation(fields: [priestId], references: [id], onDelete: Cascade)
+  id        String   @id @default(uuid())
+  priest    Priest   @relation(fields: [priestId], references: [id], onDelete: Cascade)
   priestId  String
-  puja      Puja    @relation(fields: [pujaId], references: [id], onDelete: Cascade)
+  puja      Puja     @relation(fields: [pujaId], references: [id], onDelete: Cascade)
   pujaId    String
   price     Float?
   createdAt DateTime @default(now())
@@ -201,21 +211,21 @@ model PriestAvailability {
 }
 
 model Booking {
-  id          String        @id @default(uuid())
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId      String
-  priest      Priest        @relation(fields: [priestId], references: [id])
+  priest      Priest   @relation(fields: [priestId], references: [id])
   priestId    String
-  puja        Puja          @relation(fields: [pujaId], references: [id])
+  puja        Puja     @relation(fields: [pujaId], references: [id])
   pujaId      String
   scheduledAt DateTime
-  status      String        @default("pending")
-  paid        Boolean       @default(false)
+  status      String   @default("pending")
+  paid        Boolean  @default(false)
   amount      Float
   paymentId   String?
   notes       String?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([userId, status])
   @@index([priestId, status, scheduledAt])
@@ -233,14 +243,14 @@ model Donation {
 }
 
 model Subscription {
-  id            String   @id @default(uuid())
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId        String   @unique
-  plan          String   @default("free")
+  id            String    @id @default(uuid())
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String    @unique
+  plan          String    @default("free")
   renewsAt      DateTime?
   paymentMethod String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 }
 
 model SupportTicket {
@@ -255,16 +265,20 @@ model SupportTicket {
 }
 
 model NotificationPreference {
-  id                 String  @id @default(uuid())
-  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  userId             String  @unique
-  pujaReminders      Boolean @default(true)
-  templeEventAlerts  Boolean @default(true)
-  bookingUpdates     Boolean @default(true)
-  promotionalOffers  Boolean @default(false)
-  dailySuggestions   Boolean @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                  String   @id @default(uuid())
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String   @unique
+  pujaReminders       Boolean  @default(true)
+  templeEventAlerts   Boolean  @default(true)
+  bookingUpdates      Boolean  @default(true)
+  promotionalOffers   Boolean  @default(false)
+  dailySuggestions    Boolean  @default(true)
+  sevaUpdates         Boolean  @default(true)
+  templeAnnouncements Boolean  @default(true)
+  communityEvents     Boolean  @default(true)
+  festivalUpdates     Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }
 
 model Faq {
@@ -276,12 +290,12 @@ model Faq {
 }
 
 model KnowledgeArticle {
-  id       String @id @default(uuid())
-  title    String
-  summary  String
-  content  String
-  category String @default("general")
-  imageUrl String?
+  id        String   @id @default(uuid())
+  title     String
+  summary   String
+  content   String
+  category  String   @default("general")
+  imageUrl  String?
   createdAt DateTime @default(now())
 }
 
@@ -301,35 +315,47 @@ model Message {
 }
 
 model Temple {
-  id             String        @id @default(uuid())
-  serialNumber   Int?
-  name           String
-  placeId        String        @unique
-  deityName      String?
-  address        String?
-  city           String?
-  state          String?
-  lat            Float?
-  lon            Float?
-  rating         Float?
-  reviewCount    Int?
-  phone          String?
-  website        String?
-  contactDetails String?
-  templeHistory  String?
-  significance   String?
-  sevas          String?
-  websiteLink    String?
-  googlePlaceId  String?       @unique
-  openingHours   String?
-  detailsFetchedAt DateTime?
+  id                    String           @id @default(uuid())
+  serialNumber          Int?
+  name                  String
+  placeId               String           @unique
+  deityName             String?
+  address               String?
+  city                  String?
+  state                 String?
+  lat                   Float?
+  lon                   Float?
+  rating                Float?
+  reviewCount           Int?
+  phone                 String?
+  website               String?
+  contactDetails        String?
+  templeHistory         String?
+  significance          String?
+  sevas                 String?
+  websiteLink           String?
+  googlePlaceId         String?          @unique
+  openingHours          String?
+  detailsFetchedAt      DateTime?
   // search = auto-saved from the famous list, google = saved from Google Places,
   // upload / import / admin = curated by an admin
-  source         String        @default("search")
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  events         TempleEvent[]
-  templePujas    TemplePuja[]
+  source                String           @default("search")
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  events                TempleEvent[]
+  templePujas           TemplePuja[]
+  imageUrl              String?
+  // Booking policy, set by the temple admin.
+  cancelHoursBefore     Int              @default(24)
+  refundPercent         Int              @default(100)
+  rescheduleHoursBefore Int              @default(24)
+  maxReschedules        Int              @default(1)
+  allowCounterPayment   Boolean          @default(true)
+  policyNotes           String?
+  staff                 TempleStaff[]
+  services              TempleService[]
+  followers             TempleFollow[]
+  serviceBookings       ServiceBooking[]
 
   @@index([city])
   @@index([lat, lon])
@@ -337,16 +363,40 @@ model Temple {
 }
 
 model TempleEvent {
-  id          String   @id @default(uuid())
-  temple      Temple   @relation(fields: [templeId], references: [id], onDelete: Cascade)
-  templeId    String
-  name        String
-  description String?
-  date        String
-  time        String?
-  createdAt   DateTime @default(now())
+  id               String          @id @default(uuid())
+  temple           Temple          @relation(fields: [templeId], references: [id], onDelete: Cascade)
+  templeId         String
+  name             String
+  description      String?
+  date             String
+  time             String?
+  endDate          String?
+  endTime          String?
+  // Defaults to the temple's own address/coords when empty.
+  venue            String?
+  city             String?
+  state            String?
+  lat              Float?
+  lon              Float?
+  posterUrl        String?
+  images           String?
+  contactName      String?
+  contactPhone     String?
+  contactEmail     String?
+  // none | interest | registration
+  registrationType String          @default("interest")
+  registrationInfo String?
+  capacity         Int?
+  published        Boolean         @default(true)
+  cancelled        Boolean         @default(false)
+  createdById      String?
+  responses        EventResponse[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @default(now()) @updatedAt
 
   @@index([date])
+  @@index([templeId, date])
+  @@index([city])
 }
 
 model TemplePuja {
@@ -367,4 +417,230 @@ model TempleSearchLog {
   provider    String
   resultCount Int
   fetchedAt   DateTime @default(now())
+}
+
+/// A temple admin account; each admin manages exactly one temple.
+model TempleStaff {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String   @unique
+  temple    Temple   @relation(fields: [templeId], references: [id], onDelete: Cascade)
+  templeId  String
+  title     String   @default("Temple Admin")
+  createdAt DateTime @default(now())
+
+  @@index([templeId])
+}
+
+/// Standalone festival such as Pushkaraalu, managed by the main admin.
+model Festival {
+  id          String           @id @default(uuid())
+  name        String
+  description String?
+  river       String?
+  startDate   String
+  endDate     String
+  imageUrl    String?
+  active      Boolean          @default(true)
+  ghats       FestivalGhat[]
+  services    TempleService[]
+  bookings    ServiceBooking[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model FestivalGhat {
+  id          String          @id @default(uuid())
+  festival    Festival        @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  festivalId  String
+  name        String
+  description String?
+  city        String?
+  state       String?
+  lat         Float?
+  lon         Float?
+  services    TempleService[]
+  createdAt   DateTime        @default(now())
+
+  @@index([festivalId])
+}
+
+/// A bookable Seva / Pooja / Pushkaraalu pooja / special ceremony, offered by a temple or a festival.
+model TempleService {
+  id              String           @id @default(uuid())
+  temple          Temple?          @relation(fields: [templeId], references: [id], onDelete: Cascade)
+  templeId        String?
+  festival        Festival?        @relation(fields: [festivalId], references: [id], onDelete: Cascade)
+  festivalId      String?
+  ghat            FestivalGhat?    @relation(fields: [ghatId], references: [id], onDelete: SetNull)
+  ghatId          String?
+  // seva | pooja | pushkaralu | special
+  category        String           @default("seva")
+  name            String
+  description     String?
+  price           Float            @default(0)
+  // fixed | donation (price is the minimum; devotee may give more)
+  priceType       String           @default("fixed")
+  durationMins    Int?
+  timings         String?
+  materials       String?
+  // offline | online | both
+  participation   String           @default("offline")
+  // Comma-separated: weekdays (0=Sun) the service runs, and HH:mm slot start times.
+  daysOfWeek      String           @default("0,1,2,3,4,5,6")
+  slotTimes       String           @default("06:00")
+  capacityPerSlot Int              @default(20)
+  availableFrom   String?
+  availableTo     String?
+  // Comma-separated YYYY-MM-DD; when set, only these dates are bookable (e.g. festival days).
+  specificDates   String?
+  advanceDays     Int              @default(60)
+  bookingEnabled  Boolean          @default(true)
+  active          Boolean          @default(true)
+  imageUrl        String?
+  bookings        ServiceBooking[]
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([templeId, active])
+  @@index([festivalId, active])
+}
+
+model ServiceBooking {
+  id                String               @id @default(uuid())
+  reference         String               @unique
+  service           TempleService        @relation(fields: [serviceId], references: [id])
+  serviceId         String
+  temple            Temple?              @relation(fields: [templeId], references: [id])
+  templeId          String?
+  festival          Festival?            @relation(fields: [festivalId], references: [id])
+  festivalId        String?
+  // Null for walk-in bookings entered by temple staff.
+  user              User?                @relation(fields: [userId], references: [id], onDelete: SetNull)
+  userId            String?
+  devoteeName       String
+  phone             String?
+  email             String?
+  gotra             String?
+  nakshatra         String?
+  participants      Int                  @default(1)
+  date              String
+  slotTime          String
+  scheduledAt       DateTime
+  // online | offline
+  participation     String               @default("offline")
+  // online | counter
+  paymentMode       String               @default("online")
+  amount            Float
+  // pending | paid | refunded | partially_refunded | not_required
+  paymentStatus     String               @default("pending")
+  // pending_payment | confirmed | completed | cancelled | no_show | expired
+  status            String               @default("confirmed")
+  razorpayOrderId   String?              @unique
+  razorpayPaymentId String?
+  refundAmount      Float                @default(0)
+  // app | walk_in
+  source            String               @default("app")
+  createdById       String?
+  notes             String?
+  cancelReason      String?
+  cancelledAt       DateTime?
+  cancelledBy       String?
+  rescheduleCount   Int                  @default(0)
+  reminderSentAt    DateTime?
+  checkedInAt       DateTime?
+  transactions      PaymentTransaction[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+
+  @@index([userId, createdAt])
+  @@index([templeId, date])
+  @@index([festivalId, date])
+  @@index([serviceId, date, slotTime])
+  @@index([status, scheduledAt])
+}
+
+model PaymentTransaction {
+  id           String         @id @default(uuid())
+  booking      ServiceBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  bookingId    String
+  // payment | refund
+  type         String
+  // razorpay | cash | upi | card | simulated
+  method       String
+  amount       Float
+  // success | failed | pending
+  status       String         @default("success")
+  gatewayRef   String?
+  recordedById String?
+  note         String?
+  createdAt    DateTime       @default(now())
+
+  @@index([bookingId])
+  @@index([createdAt])
+}
+
+model TempleFollow {
+  id                  String   @id @default(uuid())
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId              String
+  temple              Temple   @relation(fields: [templeId], references: [id], onDelete: Cascade)
+  templeId            String
+  notifySevas         Boolean  @default(true)
+  notifyEvents        Boolean  @default(true)
+  notifyAnnouncements Boolean  @default(true)
+  createdAt           DateTime @default(now())
+
+  @@unique([userId, templeId])
+  @@index([templeId])
+}
+
+/// A village / town / district a devotee wants local event notifications for.
+model CommunityArea {
+  id        String   @id @default(uuid())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  city      String
+  state     String   @default("")
+  createdAt DateTime @default(now())
+
+  @@unique([userId, city, state])
+  @@index([city])
+}
+
+model EventResponse {
+  id             String      @id @default(uuid())
+  event          TempleEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  eventId        String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String
+  // interested | going | registered
+  type           String
+  participants   Int         @default(1)
+  name           String?
+  phone          String?
+  reminderSentAt DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([eventId, userId])
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actorId    String?
+  actorName  String?
+  actorRole  String?
+  templeId   String?
+  festivalId String?
+  action     String
+  entityType String
+  entityId   String?
+  summary    String
+  changes    String?
+  createdAt  DateTime @default(now())
+
+  @@index([templeId, createdAt])
+  @@index([festivalId, createdAt])
+  @@index([createdAt])
 }

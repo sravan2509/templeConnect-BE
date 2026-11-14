@@ -4,6 +4,7 @@ import { app } from "./app";
 import { env } from "./config/env";
 import { prisma } from "./config/prisma";
 import { setWebSocketServer } from "./controllers/chat.controller";
+import { startScheduler, stopScheduler } from "./services/scheduler.service";
 
 const HOST = "0.0.0.0";
 const server = http.createServer(app);
@@ -24,9 +25,11 @@ server.listen(env.port, HOST, () => {
   console.log("  Env:   " + env.nodeEnv);
   console.log("═══════════════════════════════════════════");
   console.log("");
+  startScheduler();
 });
 
 async function shutdown() {
+  stopScheduler();
   wss.close();
   server.close();
   await prisma.$disconnect();

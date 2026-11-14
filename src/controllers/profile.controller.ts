@@ -64,9 +64,16 @@ const prefsSchema = z.object({
   bookingUpdates: z.boolean(),
   promotionalOffers: z.boolean(),
   dailySuggestions: z.boolean(),
+  sevaUpdates: z.boolean(),
+  templeAnnouncements: z.boolean(),
+  communityEvents: z.boolean(),
+  festivalUpdates: z.boolean(),
 }).partial().strict();
 
-const prefsSelect = { pujaReminders: true, templeEventAlerts: true, bookingUpdates: true, promotionalOffers: true, dailySuggestions: true } as const;
+const prefsSelect = {
+  pujaReminders: true, templeEventAlerts: true, bookingUpdates: true, promotionalOffers: true, dailySuggestions: true,
+  sevaUpdates: true, templeAnnouncements: true, communityEvents: true, festivalUpdates: true,
+} as const;
 
 export const getNotificationPrefs = catchAsync(async (req: AuthRequest, res: Response) => {
   const prefs = await prisma.notificationPreference.upsert({

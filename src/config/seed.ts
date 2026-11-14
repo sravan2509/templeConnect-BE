@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { seedTempleFeatures } from "./seedTempleFeatures";
 import { prisma } from "./prisma";
 import { calculateAstroProfile } from "../services/astrology.service";
 
@@ -122,6 +123,8 @@ async function seed() {
     { id: "sug-evening", nakshatra: null, rashi: null, title: "Evening Diya", body: "Light a diya near your Tulsi plant or home altar. Sit in silence for 5 minutes after lighting it.", type: "general" },
   ];
   for (const s of sugData) { await prisma.dailySuggestion.upsert({ where: { id: s.id }, update: {}, create: s }); }
+
+  await seedTempleFeatures(prisma);
 
   const counts = { users: await prisma.user.count(), pujas: await prisma.puja.count(), priests: await prisma.priest.count(), bookings: await prisma.booking.count() };
   console.log(`\n✅ Done! Users:${counts.users} Pujas:${counts.pujas} Priests:${counts.priests} Bookings:${counts.bookings}\n`);

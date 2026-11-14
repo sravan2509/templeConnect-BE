@@ -43,4 +43,22 @@ export const env = {
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
   // OAuth client IDs (web, Android, iOS) whose Google ID tokens we accept for "Continue with Google".
   googleClientIds: (process.env.GOOGLE_OAUTH_CLIENT_IDS ?? "").split(",").map((c) => c.trim()).filter(Boolean),
+  // Base URL devices use to reach this API (checkout page, locally stored uploads). No trailing slash.
+  publicApiUrl: (process.env.PUBLIC_API_URL ?? "").replace(/\/+$/, ""),
+  razorpay: {
+    keyId: process.env.RAZORPAY_KEY_ID ?? "",
+    keySecret: process.env.RAZORPAY_KEY_SECRET ?? "",
+    webhookSecret: process.env.RAZORPAY_WEBHOOK_SECRET ?? "",
+  },
+  // When unset, payments are simulated so the full flow still works in development (never in production).
+  allowSimulatedPayments: !isProduction && process.env.ALLOW_SIMULATED_PAYMENTS !== "false",
+  s3: {
+    region: process.env.AWS_REGION ?? "",
+    bucket: process.env.S3_BUCKET ?? "",
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID ?? "",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY ?? "",
+    // Public URL prefix for objects, e.g. a CloudFront domain. Defaults to the bucket's S3 URL.
+    publicBaseUrl: (process.env.S3_PUBLIC_BASE_URL ?? "").replace(/\/+$/, ""),
+    prefix: (process.env.S3_KEY_PREFIX ?? "uploads").replace(/^\/+|\/+$/g, ""),
+  },
 };
