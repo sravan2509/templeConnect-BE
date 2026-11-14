@@ -5,3 +5,5 @@ dist/
 .DS_Store
 prisma/*.db
 prisma/*.db-journal
+# Images stored on disk when S3 is not configured
+uploads/
